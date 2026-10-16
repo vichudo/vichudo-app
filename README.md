@@ -3,6 +3,21 @@
 A typesafe full-stack starter: the [T3 Stack](https://create.t3.gg/) on current
 releases, with shadcn/ui and the oxc toolchain.
 
+<!-- template-only -->
+
+## Create an app
+
+```bash
+pnpm create vichudo-app@latest my-app
+```
+
+It copies this template into `my-app`, names the project, writes a `.env`
+with a fresh auth secret, creates a git repository and installs dependencies.
+Run `pnpm create vichudo-app --help` for options, such as `--ref` to pin a
+template version. The CLI lives in [`cli/`](cli).
+
+<!-- /template-only -->
+
 | Layer           | Choice                                                                                                               |
 | --------------- | -------------------------------------------------------------------------------------------------------------------- |
 | Framework       | [Next.js 16](https://nextjs.org) — App Router, Turbopack, Cache Components, typed routes                             |

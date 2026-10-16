@@ -1,0 +1,32 @@
+{
+  "name": "create-vichudo-app",
+  "version": "0.1.0",
+  "description": "Create a typesafe full-stack app: Next.js 16, tRPC, Prisma, Better Auth, Tailwind CSS and shadcn/ui.",
+  "keywords": [
+    "better-auth",
+    "create-app",
+    "nextjs",
+    "prisma",
+    "shadcn",
+    "t3",
+    "tailwindcss",
+    "trpc"
+  ],
+  "homepage": "https://github.com/vichudo/t3-latest#readme",
+  "bugs": "https://github.com/vichudo/t3-latest/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vichudo/t3-latest.git",
+    "directory": "cli"
+  },
+  "bin": {
+    "create-vichudo-app": "./index.js"
+  },
+  "files": [
+    "index.js"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  }
+}

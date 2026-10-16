@@ -34,3 +34,20 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  create-app:
+    name: create-vichudo-app smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      # Create an app from this commit, exactly as `pnpm create vichudo-app`
+      # would from GitHub, then hold it to the same bar as the template.
+      - run: node cli/index.js "$RUNNER_TEMP/smoke-app" --template "file://$GITHUB_WORKSPACE" --yes --no-git
+      - run: pnpm check && pnpm build
+        working-directory: ${{ runner.temp }}/smoke-app
