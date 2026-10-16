@@ -16,9 +16,13 @@ export const env = createEnv({
    * missing or malformed value fails the build instead of a request.
    */
   server: {
-    AUTH_SECRET: requiredInProduction(z.string()),
-    AUTH_DISCORD_ID: requiredInProduction(z.string()),
-    AUTH_DISCORD_SECRET: requiredInProduction(z.string()),
+    // Signs sessions and tokens. Generate one with `pnpm exec auth secret`.
+    BETTER_AUTH_SECRET: requiredInProduction(z.string().min(32)),
+    // The app's public URL. Inferred from the request when unset.
+    BETTER_AUTH_URL: z.url().optional(),
+    // Google sign-in turns on once both are set.
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
     DATABASE_URL: z
       .url()
       .refine(
@@ -42,9 +46,10 @@ export const env = createEnv({
    * each key lets the bundler inline client values.
    */
   runtimeEnv: {
-    AUTH_SECRET: process.env.AUTH_SECRET,
-    AUTH_DISCORD_ID: process.env.AUTH_DISCORD_ID,
-    AUTH_DISCORD_SECRET: process.env.AUTH_DISCORD_SECRET,
+    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
   },

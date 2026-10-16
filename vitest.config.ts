@@ -20,12 +20,5 @@ export default defineConfig({
     // Unit tests never reach a real database or OAuth provider: skip the
     // schema check rather than seeding fake secrets. The app still validates.
     env: { SKIP_ENV_VALIDATION: '1' },
-    server: {
-      deps: {
-        // next-auth imports `next/server` without an extension, which Node's
-        // ESM resolver rejects; let Vite resolve it as the bundler does.
-        inline: ['next-auth'],
-      },
-    },
   },
 });

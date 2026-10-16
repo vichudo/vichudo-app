@@ -1,7 +1,9 @@
 import { ArrowUpRightIcon } from 'lucide-react';
+import Link from 'next/link';
 import { Suspense } from 'react';
 
 import { LatestPost, LatestPostSkeleton } from '@/app/_components/latest-post';
+import { SignOutButton } from '@/app/_components/sign-out-button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,7 +16,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { auth, signIn, signOut } from '@/server/auth';
+import { getSession } from '@/server/auth';
 import { caller, HydrateClient, prefetch, trpc } from '@/trpc/server';
 
 const links = [
@@ -44,7 +46,7 @@ export default function Home() {
             Create T3 App
           </h1>
           <p className="max-w-prose text-lg text-pretty text-muted-foreground">
-            A typesafe full-stack starter with shadcn/ui, Auth.js, and oxc
+            A typesafe full-stack starter with shadcn/ui, Better Auth, and oxc
             tooling.
           </p>
         </div>
@@ -84,7 +86,7 @@ export default function Home() {
 
 async function SessionPanel() {
   const [session, hello] = await Promise.all([
-    auth(),
+    getSession(),
     caller.post.hello({ text: 'from tRPC' }),
   ]);
 
@@ -97,7 +99,7 @@ async function SessionPanel() {
           <CardTitle>{hello.greeting}</CardTitle>
           <CardDescription>
             {session
-              ? `Signed in as ${session.user.name ?? session.user.email ?? 'you'}.`
+              ? `Signed in as ${session.user.name}.`
               : 'Sign in to create posts.'}
           </CardDescription>
         </CardHeader>
@@ -110,27 +112,22 @@ async function SessionPanel() {
           </CardContent>
         )}
 
-        <CardFooter className="justify-end">
+        <CardFooter className="justify-end gap-2">
           {session ? (
-            <form
-              action={async () => {
-                'use server';
-                await signOut();
-              }}
-            >
-              <Button type="submit" variant="outline">
-                Sign out
-              </Button>
-            </form>
+            <SignOutButton />
           ) : (
-            <form
-              action={async () => {
-                'use server';
-                await signIn('discord');
-              }}
-            >
-              <Button type="submit">Sign in with Discord</Button>
-            </form>
+            <>
+              <Button
+                variant="outline"
+                nativeButton={false}
+                render={<Link href="/sign-in" />}
+              >
+                Sign in
+              </Button>
+              <Button nativeButton={false} render={<Link href="/sign-up" />}>
+                Create account
+              </Button>
+            </>
           )}
         </CardFooter>
       </Card>

@@ -9,7 +9,7 @@ releases, with shadcn/ui and the oxc toolchain.
 | UI              | React 19.3, [Tailwind CSS 4](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com) (Base UI, `base-nova`)     |
 | API             | [tRPC 11](https://trpc.io) with the TanStack React Query integration, superjson                                      |
 | Database        | [Prisma 7](https://prisma.io) (`prisma-client` generator, `pg` driver adapter), PostgreSQL                           |
-| Auth            | [Auth.js](https://authjs.dev) (NextAuth v5) with the Prisma adapter and Discord                                      |
+| Auth            | [Better Auth](https://www.better-auth.com): email and password, Google ready to switch on                            |
 | Validation      | [Zod 4](https://zod.dev), env vars through [`@t3-oss/env-nextjs`](https://env.t3.gg)                                 |
 | Language        | [TypeScript 7](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/) (native compiler), strict       |
 | Lint and format | [oxlint](https://oxc.rs/docs/guide/usage/linter) (type-aware) and [oxfmt](https://oxc.rs/docs/guide/usage/formatter) |
@@ -28,10 +28,11 @@ cp .env.example .env
 
 Fill in `.env`:
 
-- `AUTH_SECRET`: generate one with `npx auth secret`.
-- `AUTH_DISCORD_ID` / `AUTH_DISCORD_SECRET`: from a
-  [Discord application](https://discord.com/developers/applications), with
-  `http://localhost:3000/api/auth/callback/discord` as a redirect URL.
+- `BETTER_AUTH_SECRET`: generate one with `pnpm auth:secret`.
+- `BETTER_AUTH_URL`: the app's URL, `http://localhost:3000` locally.
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (optional): see
+  [Google sign-in](#google-sign-in). Leave them empty to offer email and
+  password only.
 - `DATABASE_URL`: a PostgreSQL database. Two local options:
   - `pnpm db:dev` starts a local Prisma Postgres with no Docker. Copy the
     `postgres://` TCP URL it prints.
@@ -45,8 +46,9 @@ pnpm db:push
 pnpm dev
 ```
 
-In development, the Auth.js and Discord variables are optional, so the app
-runs before you set up sign-in. A production build requires all of them.
+Open http://localhost:3000 and create an account. In development the auth
+variables are optional, so the app runs before you configure them; a
+production build requires `BETTER_AUTH_SECRET`.
 
 ## Scripts
 
@@ -65,6 +67,8 @@ runs before you set up sign-in. A production build requires all of them.
 | `pnpm db:generate`                  | Regenerate the Prisma client (also runs on install)                    |
 | `pnpm db:studio`                    | Prisma Studio                                                          |
 | `pnpm db:dev`                       | Local Prisma Postgres, no Docker                                       |
+| `pnpm auth:generate`                | Add the tables Better Auth's config and plugins need to the schema     |
+| `pnpm auth:secret`                  | Generate a `BETTER_AUTH_SECRET`                                        |
 
 ## Project structure
 
@@ -73,14 +77,17 @@ prisma/schema.prisma        Database schema
 prisma.config.ts            Prisma CLI config: schema, migrations, connection URL
 src/
   app/                      Routes; page-only components in _components/
+    (auth)/                 Sign-in and sign-up pages
+    api/auth/[...all]/      Better Auth's endpoints
   components/               Shared components
     ui/                     shadcn/ui, vendored (`pnpm exec shadcn add <name>`)
   env.js                    Validated environment variables
   generated/prisma/         Generated Prisma client (gitignored)
+  lib/auth-client.ts        Better Auth for the browser: signIn, signUp, signOut
   server/
     api/routers/            tRPC routers, registered in api/root.ts
     api/trpc.ts             Context, middleware, procedure builders
-    auth/                   Auth.js config and the cached `auth()`
+    auth.ts                 Better Auth config and the cached `getSession()`
     db.ts                   Prisma client
   trpc/
     client.tsx              Provider and `useTRPC()` for Client Components
@@ -103,9 +110,37 @@ prerendered into a static shell. Request-specific parts, such as the session
 panel on the home page, stream in at request time. Opt into caching with
 `'use cache'`.
 
-**Auth.** `auth()` from `@/server/auth` reads the session once per request.
-`protectedProcedure` rejects callers without a session and gives procedures a
-non-null `ctx.session.user`.
+**Auth.** Forms call `authClient` from `@/lib/auth-client`. Server Components
+read the session with `getSession()` from `@/server/auth`, once per request.
+tRPC reads it from the request headers: `protectedProcedure` rejects callers
+without a session and gives procedures a non-null `ctx.session.user`.
+
+## Auth
+
+Email and password works out of the box: `/sign-up` creates an account and
+signs it in, and `/sign-in` signs back in. Sessions are stored in the
+database.
+
+### Google sign-in
+
+Google is configured but stays off until it has credentials:
+
+1. In the [Google Cloud console](https://console.cloud.google.com/apis/credentials),
+   create an OAuth client ID of type "Web application".
+2. Add the redirect URI `http://localhost:3000/api/auth/callback/google`, plus
+   your production URL's equivalent.
+3. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+
+"Continue with Google" then appears on both forms. The sign-in pages are
+static, so set the variables before `next build`.
+
+### Extending auth
+
+Better Auth adds features as plugins: two-factor, passkeys, magic links,
+organizations, admin. Add one in `src/server/auth.ts` (and its client plugin
+in `src/lib/auth-client.ts`), then run `pnpm auth:generate` and
+`pnpm db:migrate` for any tables it needs. Password reset and email
+verification need an email sender; `src/server/auth.ts` marks where it goes.
 
 ## Choices worth knowing about
 
@@ -123,6 +158,9 @@ non-null `ctx.session.user`.
 - **Prisma 7.** The connection URL lives in `prisma.config.ts`, and the client
   connects through `@prisma/adapter-pg`. The generated client is plain
   TypeScript in `src/generated/prisma`.
+- **Better Auth, not Auth.js.** Auth.js is now maintained by the Better Auth
+  team in security-patch mode, and they recommend Better Auth for new
+  projects.
 - **pnpm supply-chain defaults.** New releases install only after they are a
   day old. Only the dependencies listed under `allowBuilds` in
   `pnpm-workspace.yaml` may run install scripts.

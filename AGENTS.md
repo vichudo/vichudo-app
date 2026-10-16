@@ -11,7 +11,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 # Project guide
 
 A T3 app: Next.js 16 (App Router, Cache Components), tRPC 11, Prisma 7,
-Auth.js, Tailwind CSS 4 and shadcn/ui (Base UI), checked by TypeScript 7,
+Better Auth, Tailwind CSS 4 and shadcn/ui (Base UI), checked by TypeScript 7,
 oxlint and oxfmt. Package manager: pnpm 12.
 
 ## Commands
@@ -23,6 +23,9 @@ oxlint and oxfmt. Package manager: pnpm 12.
 - `pnpm test` — Vitest. Tests live next to the code as `*.test.ts`.
 - `pnpm db:push` (prototype) or `pnpm db:migrate` (migration) after editing
   `prisma/schema.prisma`; both regenerate the client.
+- `pnpm auth:generate` after adding a Better Auth plugin or user field: it
+  writes the tables auth needs into `prisma/schema.prisma`. Do not hand-edit
+  the `user`, `session`, `account` and `verification` models.
 
 ## Where things go
 
@@ -31,7 +34,9 @@ oxlint and oxfmt. Package manager: pnpm 12.
   shadcn/ui: add with `pnpm exec shadcn add <name>`, do not hand-edit.
 - `src/server/api/routers` — tRPC routers; register each in
   `src/server/api/root.ts`.
-- `src/server/auth` — Auth.js config. `src/server/db.ts` — the Prisma client.
+- `src/server/auth.ts` — Better Auth config and `getSession()` for Server
+  Components. `src/lib/auth-client.ts` — `authClient` for Client Components.
+- `src/server/db.ts` — the Prisma client.
 - `src/trpc` — `client.tsx` (hooks for Client Components), `server.tsx`
   (`trpc`, `prefetch`, `HydrateClient`, `caller` for Server Components).
 - `src/env.js` — every environment variable, validated with Zod.
@@ -51,12 +56,15 @@ oxlint and oxfmt. Package manager: pnpm 12.
 - Invalidate with `queryClient.invalidateQueries(trpc.x.pathFilter())`. The
   classic `api.useUtils()` API from `@trpc/react-query` does not exist here.
 - Cache Components is on: code that reads cookies, headers or the session
-  must render inside `<Suspense>`. `auth()` from `@/server/auth` already
-  calls `io()`; do the same before reading `Date.now()`, `Math.random()` or
+  must render inside `<Suspense>`. `getSession()` from `@/server/auth`
+  already calls `io()`; do the same before reading `Date.now()`, `Math.random()` or
   random IDs in a Server Component, or cache the value with `'use cache'`.
 - Type-only imports are a top-level `import type`. `import { type X }` on its
   own survives as a side-effect import and can pull server code into the
   client bundle (lint-enforced).
+- Sign-in, sign-up and sign-out go through `authClient`; after any of them,
+  clear the query cache (`queryClient.clear()`) so one user's data never
+  shows for the next.
 - Throw `TRPCError` from procedures. Validation messages in Zod schemas are
   shown to users, so write them as sentences.
 

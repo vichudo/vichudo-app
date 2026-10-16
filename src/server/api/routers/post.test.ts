@@ -1,5 +1,4 @@
 import { TRPCError } from '@trpc/server';
-import type { Session } from 'next-auth';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createCaller } from '@/server/api/root';
@@ -7,9 +6,24 @@ import type { createTRPCContext } from '@/server/api/trpc';
 
 type Context = Awaited<ReturnType<typeof createTRPCContext>>;
 
-const session: Session = {
-  user: { id: 'user_1', name: 'Ada' },
-  expires: new Date(Date.now() + 60_000).toISOString(),
+const now = new Date();
+const session: NonNullable<Context['session']> = {
+  user: {
+    id: 'user_1',
+    name: 'Ada',
+    email: 'ada@example.com',
+    emailVerified: true,
+    createdAt: now,
+    updatedAt: now,
+  },
+  session: {
+    id: 'session_1',
+    token: 'token_1',
+    userId: 'user_1',
+    expiresAt: new Date(now.getTime() + 60_000),
+    createdAt: now,
+    updatedAt: now,
+  },
 };
 
 /** A caller over a stubbed database: procedures run without Postgres. */

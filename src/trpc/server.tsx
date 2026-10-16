@@ -7,6 +7,7 @@ import {
   type QueryKey,
 } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
+import { io } from 'next/cache';
 import { headers } from 'next/headers';
 import { cache } from 'react';
 
@@ -19,6 +20,8 @@ import { makeQueryClient } from '@/trpc/query-client';
  * request.
  */
 const createContext = cache(async () => {
+  // Reading the session needs request-time values (see `getSession`).
+  await io();
   const heads = new Headers(await headers());
   heads.set('x-trpc-source', 'rsc');
 

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     template: '%s · T3 App',
   },
   description:
-    'Next.js 16, tRPC 11, Prisma 7, Auth.js, Tailwind CSS 4 and shadcn/ui.',
+    'Next.js 16, tRPC 11, Prisma 7, Better Auth, Tailwind CSS 4 and shadcn/ui.',
   icons: [{ rel: 'icon', url: '/favicon.ico' }],
 };
 
