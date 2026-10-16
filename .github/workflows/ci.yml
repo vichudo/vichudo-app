@@ -17,6 +17,9 @@ jobs:
     env:
       # The build validates env vars; CI has no secrets or database to give it.
       SKIP_ENV_VALIDATION: '1'
+      # Better Auth refuses its default secret in production builds. A
+      # placeholder for CI only; real deployments set their own.
+      BETTER_AUTH_SECRET: ci-placeholder-secret-never-used-for-real-sessions
     steps:
       - uses: actions/checkout@v7
       # Installs the pnpm version pinned in package.json `packageManager`.

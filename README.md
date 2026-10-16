@@ -174,4 +174,6 @@ verification need an email sender; `src/server/auth.ts` marks where it goes.
 Set the variables from `.env.example` in your host, run
 `pnpm db:deploy` against the production database, and deploy as any Next.js
 app. On [Vercel](https://vercel.com), `prisma generate` runs on install and
-`next build` validates the environment.
+`next build` validates the environment. The build loads the auth config, so
+`BETTER_AUTH_SECRET` must be available at build time too (Docker: pass it as a
+build secret).
