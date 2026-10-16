@@ -12,6 +12,12 @@ allowBuilds:
 
 # What else dependencies may do. tRPC ships agent skills that document the
 # installed version; pnpm links them into `.claude/skills` (gitignored).
+# Named explicitly: pnpm otherwise detects agents on the machine, and fails the
+# install where it finds none (CI, editors other than Claude Code).
+skills:
+  dirs:
+    - .claude/skills
+
 permissions:
   '@trpc/client':
     skills: true
