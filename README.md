@@ -1,165 +1,139 @@
-# t3-latest
+# T3 App
 
-T3 stack starter updated to latest everything. Next.js 16 + tRPC 11 + Auth.js v5 + Prisma 6 + Tailwind v4.
+A typesafe full-stack starter: the [T3 Stack](https://create.t3.gg/) on current
+releases, with shadcn/ui and the oxc toolchain.
 
-## Use This Template
+| Layer           | Choice                                                                                                               |
+| --------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Framework       | [Next.js 16](https://nextjs.org) — App Router, Turbopack, Cache Components, typed routes                             |
+| UI              | React 19.3, [Tailwind CSS 4](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com) (Base UI, `base-nova`)     |
+| API             | [tRPC 11](https://trpc.io) with the TanStack React Query integration, superjson                                      |
+| Database        | [Prisma 7](https://prisma.io) (`prisma-client` generator, `pg` driver adapter), PostgreSQL                           |
+| Auth            | [Auth.js](https://authjs.dev) (NextAuth v5) with the Prisma adapter and Discord                                      |
+| Validation      | [Zod 4](https://zod.dev), env vars through [`@t3-oss/env-nextjs`](https://env.t3.gg)                                 |
+| Language        | [TypeScript 7](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/) (native compiler), strict       |
+| Lint and format | [oxlint](https://oxc.rs/docs/guide/usage/linter) (type-aware) and [oxfmt](https://oxc.rs/docs/guide/usage/formatter) |
+| Tests           | [Vitest 5](https://vitest.dev)                                                                                       |
+| Tooling         | pnpm 12, Husky + lint-staged, GitHub Actions CI                                                                      |
+
+## Getting started
+
+Requires Node.js 24+ and [Corepack](https://nodejs.org/api/corepack.html)
+(`corepack enable`), which installs the pnpm version pinned in `package.json`.
 
 ```bash
-gh repo create my-app --template vichudo/t3-latest --clone
-cd my-app
 pnpm install
-cp .env.example .env       # edit DATABASE_URL
-pnpm db:push               # push schema to db
-pnpm dev                   # http://localhost:3000
+cp .env.example .env
 ```
 
-Or without creating a repo:
+Fill in `.env`:
+
+- `AUTH_SECRET`: generate one with `npx auth secret`.
+- `AUTH_DISCORD_ID` / `AUTH_DISCORD_SECRET`: from a
+  [Discord application](https://discord.com/developers/applications), with
+  `http://localhost:3000/api/auth/callback/discord` as a redirect URL.
+- `DATABASE_URL`: a PostgreSQL database. Two local options:
+  - `pnpm db:dev` starts a local Prisma Postgres with no Docker. Copy the
+    `postgres://` TCP URL it prints.
+  - `./start-database.sh` starts PostgreSQL in Docker or Podman, using the
+    URL already in `.env`.
+
+Then create the tables and start the app:
 
 ```bash
-npx degit vichudo/t3-latest my-app
+pnpm db:push
+pnpm dev
 ```
 
-## What's Included
-
-| What       | Version / Notes                          |
-| ---------- | ---------------------------------------- |
-| Next.js    | 16 (App Router, Turbopack default)       |
-| tRPC       | 11 (React Query 5, SuperJSON, streaming) |
-| Auth.js    | v5 (Prisma adapter, Discord provider)    |
-| Prisma     | 6 (PostgreSQL)                           |
-| Tailwind   | v4                                       |
-| TypeScript | 5 (strict, noUncheckedIndexedAccess)     |
-| ESLint     | 9 (flat config, no `next lint`)          |
-| Zod        | 3 (input validation)                     |
-
-## Project Structure
-
-```
-src/
-  app/
-    api/auth/[...nextauth]/   Auth handler
-    api/trpc/[trpc]/          tRPC handler
-    _components/              Client components
-    layout.tsx                Root layout (TRPCReactProvider)
-    page.tsx                  Home (server component)
-  server/
-    api/routers/              Add tRPC routers here
-    api/root.ts               Register routers here
-    api/trpc.ts               Context + procedures
-    auth/config.ts            Auth providers + callbacks
-    auth/index.ts             auth(), signIn, signOut
-    db.ts                     Prisma client
-  trpc/
-    react.tsx                 Client hooks (api.x.useQuery)
-    server.ts                 RSC caller (await api.x())
-    query-client.ts           React Query config
-  env.js                      Env validation (Zod)
-prisma/
-  schema.prisma               DB schema
-```
-
-## Recipes
-
-### Add a tRPC router
-
-```ts
-// src/server/api/routers/todo.ts
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-
-export const todoRouter = createTRPCRouter({
-  list: protectedProcedure.query(({ ctx }) =>
-    ctx.db.todo.findMany({ where: { userId: ctx.session.user.id } }),
-  ),
-  create: protectedProcedure
-    .input(z.object({ title: z.string().min(1) }))
-    .mutation(({ ctx, input }) =>
-      ctx.db.todo.create({ data: { title: input.title, userId: ctx.session.user.id } }),
-    ),
-});
-```
-
-Register it:
-
-```ts
-// src/server/api/root.ts
-import { todoRouter } from "./routers/todo";
-
-export const appRouter = createTRPCRouter({
-  post: postRouter,
-  todo: todoRouter, // add here
-});
-```
-
-Use it:
-
-```tsx
-// Server Component
-const todos = await api.todo.list();
-
-// Client Component ("use client")
-const [todos] = api.todo.list.useSuspenseQuery();
-const create = api.todo.create.useMutation();
-```
-
-### Add an auth provider
-
-```ts
-// src/server/auth/config.ts
-import GitHubProvider from "next-auth/providers/github";
-
-export const authConfig = {
-  providers: [
-    DiscordProvider,
-    GitHubProvider, // add provider
-  ],
-  // ...
-} satisfies NextAuthConfig;
-```
-
-Add the env vars to `.env` and register them in `src/env.js`.
-
-### Database
-
-```bash
-pnpm db:push        # apply schema changes (dev)
-pnpm db:generate    # create a migration
-pnpm db:migrate     # run migrations (prod)
-pnpm db:studio      # visual editor
-```
+In development, the Auth.js and Discord variables are optional, so the app
+runs before you set up sign-in. A production build requires all of them.
 
 ## Scripts
 
-| Command              | What it does                    |
-| -------------------- | ------------------------------- |
-| `pnpm dev`           | Start dev server (Turbopack)    |
-| `pnpm build`         | Production build (Turbopack)    |
-| `pnpm start`         | Start production server         |
-| `pnpm check`         | Lint + typecheck                |
-| `pnpm lint`          | ESLint                          |
-| `pnpm lint:fix`      | ESLint with auto-fix            |
-| `pnpm typecheck`     | TypeScript only                 |
-| `pnpm format:write`  | Prettier format                 |
-| `pnpm db:push`       | Push Prisma schema to DB        |
-| `pnpm db:studio`     | Open Prisma Studio              |
+| Script                              | What it does                                                           |
+| ----------------------------------- | ---------------------------------------------------------------------- |
+| `pnpm dev`                          | Dev server with Turbopack                                              |
+| `pnpm build` / `pnpm start`         | Production build and server                                            |
+| `pnpm check`                        | Format check, lint, typecheck and tests: what CI runs, minus the build |
+| `pnpm lint` / `pnpm lint:fix`       | oxlint, with autofixes                                                 |
+| `pnpm format` / `pnpm format:check` | oxfmt                                                                  |
+| `pnpm typecheck`                    | Generates route types, then runs `tsc`                                 |
+| `pnpm test` / `pnpm test:watch`     | Vitest                                                                 |
+| `pnpm db:push`                      | Sync the schema to the database without a migration (prototyping)      |
+| `pnpm db:migrate`                   | Create and apply a migration in development                            |
+| `pnpm db:deploy`                    | Apply pending migrations (production)                                  |
+| `pnpm db:generate`                  | Regenerate the Prisma client (also runs on install)                    |
+| `pnpm db:studio`                    | Prisma Studio                                                          |
+| `pnpm db:dev`                       | Local Prisma Postgres, no Docker                                       |
 
-## Environment Variables
+## Project structure
 
-Configure in `.env`, validated at build time by `src/env.js`.
+```text
+prisma/schema.prisma        Database schema
+prisma.config.ts            Prisma CLI config: schema, migrations, connection URL
+src/
+  app/                      Routes; page-only components in _components/
+  components/               Shared components
+    ui/                     shadcn/ui, vendored (`pnpm exec shadcn add <name>`)
+  env.js                    Validated environment variables
+  generated/prisma/         Generated Prisma client (gitignored)
+  server/
+    api/routers/            tRPC routers, registered in api/root.ts
+    api/trpc.ts             Context, middleware, procedure builders
+    auth/                   Auth.js config and the cached `auth()`
+    db.ts                   Prisma client
+  trpc/
+    client.tsx              Provider and `useTRPC()` for Client Components
+    server.tsx              `trpc`, `prefetch`, `HydrateClient`, `caller` for RSC
+```
 
-| Variable             | Required    | How to get                          |
-| -------------------- | ----------- | ----------------------------------- |
-| `DATABASE_URL`       | Always      | Your PostgreSQL connection string   |
-| `AUTH_SECRET`        | Production  | Run `npx auth secret`              |
-| `AUTH_DISCORD_ID`    | If using    | https://discord.com/developers      |
-| `AUTH_DISCORD_SECRET`| If using    | Same as above                       |
+## How the pieces fit
 
-## Deploy
+**Fetching data.** A Server Component prefetches with
+`prefetch(trpc.post.getLatest.queryOptions())` and wraps its subtree in
+`<HydrateClient>`. A Client Component below it calls
+`useSuspenseQuery(trpc.post.getLatest.queryOptions())` and gets the streamed
+result with no extra request. Mutations use
+`useMutation(trpc.post.create.mutationOptions())` and invalidate with
+`queryClient.invalidateQueries(trpc.post.pathFilter())`.
 
-Works out of the box on [Vercel](https://vercel.com). Set your env vars and push.
+**Rendering.** Cache Components and Partial Prefetching are on, the defaults
+for new Next.js 16.4 apps. Everything outside a `<Suspense>` boundary is
+prerendered into a static shell. Request-specific parts, such as the session
+panel on the home page, stream in at request time. Opt into caching with
+`'use cache'`.
 
-For other platforms, see the [T3 deployment guides](https://create.t3.gg/en/deployment).
+**Auth.** `auth()` from `@/server/auth` reads the session once per request.
+`protectedProcedure` rejects callers without a session and gives procedures a
+non-null `ctx.session.user`.
 
-## Based On
+## Choices worth knowing about
 
-[create-t3-app](https://create.t3.gg) v7.40.0, updated for Next.js 16.
+- **oxlint, not ESLint.** One config (`.oxlintrc.json`) covers the
+  `eslint-config-next` rules plus type-aware TypeScript, React, import,
+  accessibility and Vitest rules. It also enforces this template's
+  boundaries: env access goes through `@/env`, UI never imports `@/server`,
+  and imports use `@/` rather than `../`.
+- **oxfmt, not Prettier.** Prettier-compatible output. It sorts imports and
+  Tailwind classes, including inside `cn()` and `cva()`.
+- **TypeScript 7.** `next build` and `tsc` use the native compiler. It has no
+  JavaScript API yet, so editors need the
+  [TypeScript Native Preview](https://marketplace.visualstudio.com/items?itemName=TypeScriptTeam.native-preview)
+  extension (recommended in `.vscode/extensions.json`).
+- **Prisma 7.** The connection URL lives in `prisma.config.ts`, and the client
+  connects through `@prisma/adapter-pg`. The generated client is plain
+  TypeScript in `src/generated/prisma`.
+- **pnpm supply-chain defaults.** New releases install only after they are a
+  day old. Only the dependencies listed under `allowBuilds` in
+  `pnpm-workspace.yaml` may run install scripts.
+- **Agent-ready.** `AGENTS.md` (read by `CLAUDE.md`) documents the project's
+  conventions under a block that `next dev` keeps in sync with the installed
+  Next.js docs. tRPC's own agent skills are linked into `.claude/skills` on
+  install, and a Claude Code hook formats every file an agent edits.
+
+## Deploying
+
+Set the variables from `.env.example` in your host, run
+`pnpm db:deploy` against the production database, and deploy as any Next.js
+app. On [Vercel](https://vercel.com), `prisma generate` runs on install and
+`next build` validates the environment.

@@ -1,69 +1,153 @@
-import Link from "next/link";
+import { ArrowUpRightIcon } from 'lucide-react';
+import { Suspense } from 'react';
 
-import { LatestPost } from "@/app/_components/post";
-import { auth } from "@/server/auth";
-import { api, HydrateClient } from "@/trpc/server";
+import { LatestPost, LatestPostSkeleton } from '@/app/_components/latest-post';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { auth, signIn, signOut } from '@/server/auth';
+import { caller, HydrateClient, prefetch, trpc } from '@/trpc/server';
 
-export default async function Home() {
-  const hello = await api.post.hello({ text: "from tRPC" });
-  const session = await auth();
+const links = [
+  {
+    href: 'https://create.t3.gg/en/usage/first-steps',
+    title: 'First steps',
+    description: 'Set up the database and authentication.',
+  },
+  {
+    href: 'https://create.t3.gg/en/introduction',
+    title: 'Documentation',
+    description: 'The libraries in this stack, and how to deploy it.',
+  },
+] as const;
 
-  if (session?.user) {
-    void api.post.getLatest.prefetch();
-  }
+// Everything outside <Suspense> is prerendered into the static shell; the
+// session panel reads cookies, so it streams in at request time.
+export default function Home() {
+  return (
+    <main className="mx-auto flex min-h-svh w-full max-w-3xl flex-col gap-10 px-6 py-16">
+      <header className="flex items-start justify-between gap-6">
+        <div className="flex flex-col gap-3">
+          <Badge variant="secondary">
+            Next.js 16 · tRPC 11 · Prisma 7 · Tailwind 4
+          </Badge>
+          <h1 className="font-heading text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+            Create T3 App
+          </h1>
+          <p className="max-w-prose text-lg text-pretty text-muted-foreground">
+            A typesafe full-stack starter with shadcn/ui, Auth.js, and oxc
+            tooling.
+          </p>
+        </div>
+        <ThemeToggle />
+      </header>
+
+      <nav className="grid gap-4 sm:grid-cols-2">
+        {links.map((link) => (
+          <Card
+            key={link.href}
+            className="relative transition-colors hover:bg-muted/50"
+          >
+            <CardHeader>
+              <CardTitle>
+                <a
+                  href={link.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 after:absolute after:inset-0"
+                >
+                  {link.title}
+                  <ArrowUpRightIcon className="size-4" aria-hidden />
+                </a>
+              </CardTitle>
+              <CardDescription>{link.description}</CardDescription>
+            </CardHeader>
+          </Card>
+        ))}
+      </nav>
+
+      <Suspense fallback={<SessionSkeleton />}>
+        <SessionPanel />
+      </Suspense>
+    </main>
+  );
+}
+
+async function SessionPanel() {
+  const [session, hello] = await Promise.all([
+    auth(),
+    caller.post.hello({ text: 'from tRPC' }),
+  ]);
+
+  if (session) prefetch(trpc.post.getLatest.queryOptions());
 
   return (
     <HydrateClient>
-      <main className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-[#2e026d] to-[#15162c] text-white">
-        <div className="container flex flex-col items-center justify-center gap-12 px-4 py-16">
-          <h1 className="text-5xl font-extrabold tracking-tight sm:text-[5rem]">
-            Create <span className="text-[hsl(280,100%,70%)]">T3</span> App
-          </h1>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-8">
-            <Link
-              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-              href="https://create.t3.gg/en/usage/first-steps"
-              target="_blank"
-            >
-              <h3 className="text-2xl font-bold">First Steps →</h3>
-              <div className="text-lg">
-                Just the basics - Everything you need to know to set up your
-                database and authentication.
-              </div>
-            </Link>
-            <Link
-              className="flex max-w-xs flex-col gap-4 rounded-xl bg-white/10 p-4 hover:bg-white/20"
-              href="https://create.t3.gg/en/introduction"
-              target="_blank"
-            >
-              <h3 className="text-2xl font-bold">Documentation →</h3>
-              <div className="text-lg">
-                Learn more about Create T3 App, the libraries it uses, and how
-                to deploy it.
-              </div>
-            </Link>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-2xl text-white">
-              {hello ? hello.greeting : "Loading tRPC query..."}
-            </p>
+      <Card>
+        <CardHeader>
+          <CardTitle>{hello.greeting}</CardTitle>
+          <CardDescription>
+            {session
+              ? `Signed in as ${session.user.name ?? session.user.email ?? 'you'}.`
+              : 'Sign in to create posts.'}
+          </CardDescription>
+        </CardHeader>
 
-            <div className="flex flex-col items-center justify-center gap-4">
-              <p className="text-center text-2xl text-white">
-                {session && <span>Logged in as {session.user?.name}</span>}
-              </p>
-              <Link
-                href={session ? "/api/auth/signout" : "/api/auth/signin"}
-                className="rounded-full bg-white/10 px-10 py-3 font-semibold no-underline transition hover:bg-white/20"
-              >
-                {session ? "Sign out" : "Sign in"}
-              </Link>
-            </div>
-          </div>
+        {session && (
+          <CardContent>
+            <Suspense fallback={<LatestPostSkeleton />}>
+              <LatestPost />
+            </Suspense>
+          </CardContent>
+        )}
 
-          {session?.user && <LatestPost />}
-        </div>
-      </main>
+        <CardFooter className="justify-end">
+          {session ? (
+            <form
+              action={async () => {
+                'use server';
+                await signOut();
+              }}
+            >
+              <Button type="submit" variant="outline">
+                Sign out
+              </Button>
+            </form>
+          ) : (
+            <form
+              action={async () => {
+                'use server';
+                await signIn('discord');
+              }}
+            >
+              <Button type="submit">Sign in with Discord</Button>
+            </form>
+          )}
+        </CardFooter>
+      </Card>
     </HydrateClient>
+  );
+}
+
+function SessionSkeleton() {
+  return (
+    <Card aria-busy>
+      <CardHeader>
+        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-4 w-36" />
+      </CardHeader>
+      <CardFooter className="justify-end">
+        <Skeleton className="h-8 w-40" />
+      </CardFooter>
+    </Card>
   );
 }

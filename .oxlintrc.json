@@ -1,0 +1,332 @@
+// Oxlint: https://oxc.rs/docs/guide/usage/linter/config
+//
+// Severity policy:
+// - "error": fix before merging. Correctness, type safety, and the shapes
+//   generated code drifts into (`any`, unawaited promises, defensive checks the
+//   types already rule out, stray logs, dead branches).
+// - "warn": code-shape heuristics (size, nesting, TODOs). They point at
+//   refactor candidates and never fail CI.
+// - "off": each with its reason.
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "eslint",
+    "typescript",
+    "unicorn",
+    "oxc",
+    "react",
+    "nextjs",
+    "jsx-a11y",
+    "import",
+    "promise",
+    "node",
+    "vitest"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "env": {
+    "browser": true,
+    "node": true
+  },
+  "options": {
+    // Type-aware rules run through oxlint-tsgolint (typescript-go).
+    "typeAware": true,
+    "reportUnusedDisableDirectives": "error"
+  },
+  "settings": {
+    "react": {
+      "version": "19.3",
+      "linkComponents": [{ "name": "Link", "linkAttribute": "href" }]
+    }
+  },
+  // shadcn/ui code is vendored from the registry and re-pulled with
+  // `shadcn add`: formatted, not linted. Name the vendored files rather than
+  // their folders, so our own hooks and lib modules stay linted.
+  "ignorePatterns": [
+    "src/components/ui/**",
+    "src/hooks/use-mobile.ts",
+    "src/hooks/use-highlighted-code.ts",
+    "src/lib/highlighter.tsx",
+    "src/generated/**"
+  ],
+  "rules": {
+    // ── TypeScript: keep `any` and unchecked casts out ──────────────────────
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-namespace": "error",
+    "typescript/ban-ts-comment": [
+      "error",
+      {
+        "ts-expect-error": "allow-with-description",
+        "minimumDescriptionLength": 10
+      }
+    ],
+    "typescript/prefer-ts-expect-error": "error",
+    "typescript/consistent-type-imports": [
+      "error",
+      { "prefer": "type-imports", "fixStyle": "inline-type-imports" }
+    ],
+    // `import { type X }` alone survives `verbatimModuleSyntax` as a
+    // side-effect import, which pulls a server module graph into the client
+    // bundle. Type-only imports must be a top-level `import type`.
+    "typescript/no-import-type-side-effects": "error",
+    "typescript/no-inferrable-types": "error",
+    // Pairs with `noUncheckedIndexedAccess`, so it never asks to drop a guard
+    // that indexing actually needs.
+    "typescript/no-unnecessary-condition": "error",
+    // `||` on strings is how an empty form field or env var reads as missing.
+    "typescript/prefer-nullish-coalescing": [
+      "error",
+      { "ignorePrimitives": { "string": true } }
+    ],
+    "typescript/prefer-optional-chain": "error",
+    "typescript/switch-exhaustiveness-check": [
+      "error",
+      { "considerDefaultExhaustiveForUnions": true }
+    ],
+    "typescript/no-misused-promises": [
+      "error",
+      { "checksVoidReturn": { "attributes": false } }
+    ],
+    "typescript/require-await": "error",
+    "typescript/return-await": ["error", "in-try-catch"],
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/use-unknown-in-catch-callback-variable": "error",
+    "typescript/no-deprecated": "error",
+    "typescript/prefer-find": "error",
+    "typescript/prefer-includes": "error",
+    "typescript/prefer-string-starts-ends-with": "error",
+    // Too noisy for idiomatic TSX (`{ '--var': x } as CSSProperties`).
+    "typescript/no-unsafe-type-assertion": "off",
+    // Conditional effect cleanups are idiomatic.
+    "typescript/consistent-return": "off",
+
+    // ── Core JS ─────────────────────────────────────────────────────────────
+    "eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrors": "all",
+        "caughtErrorsIgnorePattern": "^_",
+        "destructuredArrayIgnorePattern": "^_",
+        "ignoreRestSiblings": true
+      }
+    ],
+    "eslint/no-console": ["error", { "allow": ["info", "warn", "error"] }],
+    "eslint/no-alert": "error",
+    "eslint/eqeqeq": ["error", "always", { "null": "ignore" }],
+    "eslint/no-var": "error",
+    "eslint/prefer-const": "error",
+    "eslint/object-shorthand": "error",
+    "eslint/prefer-template": "error",
+    "eslint/prefer-object-spread": "error",
+    "eslint/prefer-object-has-own": "error",
+    "eslint/no-else-return": ["error", { "allowElseIf": false }],
+    "eslint/no-lonely-if": "error",
+    "eslint/no-nested-ternary": "error",
+    "eslint/no-implicit-coercion": ["error", { "boolean": false }],
+    "eslint/no-param-reassign": "error",
+    "eslint/no-return-assign": "error",
+    "eslint/no-sequences": "error",
+    "eslint/no-empty": ["error", { "allowEmptyCatch": false }],
+    "eslint/no-empty-function": "error",
+    "eslint/no-useless-return": "error",
+    "eslint/no-useless-computed-key": "error",
+    "eslint/no-useless-assignment": "error",
+    "eslint/no-self-compare": "error",
+    "eslint/no-template-curly-in-string": "error",
+    "eslint/no-promise-executor-return": "error",
+    "eslint/no-case-declarations": "error",
+    "eslint/no-fallthrough": "error",
+    "eslint/default-case-last": "error",
+    "eslint/default-param-last": "error",
+    "eslint/array-callback-return": "error",
+    "eslint/radix": "error",
+    "eslint/max-params": ["error", 4],
+    "eslint/preserve-caught-error": "error",
+    // Prisma aggregates (`_count`) and tRPC internals (`t._config`).
+    "eslint/no-underscore-dangle": "off",
+
+    // ── Code-shape heuristics (warn only) ───────────────────────────────────
+    "eslint/complexity": ["warn", 20],
+    "eslint/max-depth": ["warn", 4],
+    "eslint/max-nested-callbacks": ["warn", 3],
+    "eslint/max-lines": [
+      "warn",
+      { "max": 500, "skipBlankLines": true, "skipComments": true }
+    ],
+    "eslint/no-warning-comments": [
+      "warn",
+      { "terms": ["todo", "fixme", "hack", "xxx"] }
+    ],
+
+    // ── Unicorn: modern, unsurprising built-ins ─────────────────────────────
+    "unicorn/filename-case": ["error", { "case": "kebabCase" }],
+    "unicorn/no-abusive-eslint-disable": "error",
+    "unicorn/prefer-node-protocol": "error",
+    "unicorn/throw-new-error": "error",
+    "unicorn/prefer-type-error": "error",
+    "unicorn/error-message": "error",
+    "unicorn/no-process-exit": "error",
+    "unicorn/no-array-for-each": "error",
+    "unicorn/no-instanceof-array": "error",
+    "unicorn/no-typeof-undefined": "error",
+    "unicorn/no-negation-in-equality-check": "error",
+    "unicorn/no-unreadable-iife": "error",
+    "unicorn/no-useless-promise-resolve-reject": "error",
+    "unicorn/no-useless-switch-case": "error",
+    "unicorn/prefer-at": "error",
+    "unicorn/prefer-array-flat": "error",
+    "unicorn/prefer-array-flat-map": "error",
+    "unicorn/prefer-array-some": "error",
+    "unicorn/prefer-date-now": "error",
+    "unicorn/prefer-default-parameters": "error",
+    "unicorn/prefer-includes": "error",
+    "unicorn/prefer-logical-operator-over-ternary": "error",
+    "unicorn/prefer-math-min-max": "error",
+    "unicorn/prefer-modern-math-apis": "error",
+    "unicorn/prefer-number-properties": "error",
+    "unicorn/prefer-object-from-entries": "error",
+    "unicorn/prefer-optional-catch-binding": "error",
+    "unicorn/prefer-regexp-test": "error",
+    "unicorn/prefer-response-static-json": "error",
+    "unicorn/prefer-string-replace-all": "error",
+    "unicorn/prefer-string-slice": "error",
+    "unicorn/prefer-string-trim-start-end": "error",
+    "unicorn/prefer-structured-clone": "error",
+    "unicorn/text-encoding-identifier-case": "error",
+    // `toSorted`/`toReversed` need lib ES2023; tsconfig targets ES2022.
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-array-reverse": "off",
+    // Next.js reads route segment config from local exports.
+    "unicorn/prefer-export-from": "off",
+
+    // ── Imports ─────────────────────────────────────────────────────────────
+    "import/no-duplicates": "error",
+    "import/no-cycle": "error",
+    "import/no-self-import": "error",
+    "import/first": "error",
+    "import/newline-after-import": "error",
+    "import/no-mutable-exports": "error",
+    "import/no-anonymous-default-export": "error",
+    // Reach across directories through the `@/` alias, never `../`.
+    "import/no-relative-parent-imports": "error",
+    "import/no-unassigned-import": [
+      "error",
+      { "allow": ["**/*.css", "server-only", "client-only", "./src/env.js"] }
+    ],
+    // superjson's default export is that library's API.
+    "import/no-named-as-default": "off",
+    "import/no-named-as-default-member": "off",
+
+    // ── Environment ─────────────────────────────────────────────────────────
+    // Read variables through the validated `env` from `@/env`. The allowed
+    // ones are set by Node.js or the platform, not by this app.
+    "node/no-process-env": [
+      "error",
+      { "allowedVariables": ["NODE_ENV", "VERCEL_URL", "PORT"] }
+    ],
+
+    // ── Promises ────────────────────────────────────────────────────────────
+    "promise/no-nesting": "error",
+    "promise/no-return-wrap": "error",
+    "promise/param-names": "error",
+    "promise/prefer-catch": "error",
+
+    // ── React ───────────────────────────────────────────────────────────────
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    "react/no-deriving-state-in-effects": "error",
+    "react/jsx-no-useless-fragment": ["error", { "allowExpressions": true }],
+    "react/jsx-fragments": ["error", "syntax"],
+    "react/jsx-boolean-value": "error",
+    "react/jsx-curly-brace-presence": [
+      "error",
+      { "props": "never", "children": "ignore" }
+    ],
+    "react/jsx-pascal-case": "error",
+    "react/self-closing-comp": "error",
+    "react/jsx-no-target-blank": "error",
+    "react/button-has-type": "error",
+    "react/checked-requires-onchange-or-readonly": "error",
+    "react/no-unknown-property": "error",
+    "react/no-unstable-nested-components": ["error", { "allowAsProps": true }],
+    // Automatic JSX runtime: React does not need to be in scope.
+    "react/react-in-jsx-scope": "off",
+
+    // ── Accessibility ───────────────────────────────────────────────────────
+    "jsx-a11y/anchor-ambiguous-text": "error",
+    "jsx-a11y/no-autofocus": ["error", { "ignoreNonDOM": true }],
+    "jsx-a11y/label-has-associated-control": [
+      "error",
+      {
+        "controlComponents": [
+          "Checkbox",
+          "Input",
+          "RadioGroupItem",
+          "Select",
+          "Slider",
+          "Switch",
+          "Textarea"
+        ]
+      }
+    ],
+    // Misreads Base UI's `render={<a />}` composition, where the label is the
+    // children.
+    "jsx-a11y/control-has-associated-label": "off",
+
+    // ── Tests ───────────────────────────────────────────────────────────────
+    "vitest/no-focused-tests": "error",
+    "vitest/no-disabled-tests": "error",
+    "vitest/no-identical-title": "error",
+    "vitest/no-commented-out-tests": "error"
+  },
+  "overrides": [
+    {
+      // Layering: UI reaches the server through tRPC (`@/trpc/*`) and server
+      // actions, never by importing server modules.
+      "files": ["src/components/**", "src/hooks/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "^@/server(/|$)",
+                "message": "UI reaches the server through tRPC (`@/trpc/*`), never by importing it."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // The env schema and tool configs are where `process.env` is read.
+      "files": ["src/env.js", "prisma.config.ts", "vitest.config.ts"],
+      "rules": { "node/no-process-env": "off" }
+    },
+    {
+      // Tests mock freely and assert on shapes the types already promise.
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "eslint/max-nested-callbacks": "off"
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Format, lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # The build validates env vars; CI has no secrets or database to give it.
+      SKIP_ENV_VALIDATION: '1'
+    steps:
+      - uses: actions/checkout@v7
+      # Installs the pnpm version pinned in package.json `packageManager`.
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint --format github
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build

@@ -1,0 +1,21 @@
+# pnpm reads its settings from here, not from package.json or .npmrc.
+# https://pnpm.io/settings
+#
+# Supply-chain defaults stay on: a release must be a day old before it can be
+# installed (`minimumReleaseAge`), and exotic transitive sources are blocked.
+
+# Dependencies allowed to run install scripts. Anything not listed fails the
+# install (`strictDepBuilds`), so a new native dependency is a deliberate choice.
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true
+
+# What else dependencies may do. tRPC ships agent skills that document the
+# installed version; pnpm links them into `.claude/skills` (gitignored).
+permissions:
+  '@trpc/client':
+    skills: true
+  '@trpc/server':
+    skills: true
+  '@trpc/tanstack-react-query':
+    skills: true
