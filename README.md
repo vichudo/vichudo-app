@@ -12,12 +12,19 @@ pnpm create vichudo-app@latest my-app
 ```
 
 That is the whole setup. It copies this template, names the project, gives
-it its own local database, writes a `.env` with a fresh auth secret, creates
-a git repository and installs dependencies. Then follow the steps it prints,
-which are [Quick start](#quick-start) without the first two commands.
+it its own local database, writes a `.env` with a fresh auth secret, fetches
+the latest shadcn/ui components, creates a git repository and installs
+dependencies. Then follow the steps it prints, which are
+[Quick start](#quick-start) without the first two commands.
 
-`pnpm create vichudo-app --help` lists the options, such as `--ref` to pin a
-template version. The CLI's source is in [`cli/`](cli).
+It asks one question: all shadcn/ui components, or just the essentials the
+template's pages use. Either way they come fresh from the registry, so a new
+app never starts with stale copies. This repository keeps only the
+essentials.
+
+`pnpm create vichudo-app --help` lists the options, such as `--components`
+and `--ref` to pin a template version. The CLI's source is in
+[`cli/`](cli).
 
 <!-- /template-only -->
 
@@ -157,14 +164,21 @@ regenerates the Prisma client.
 
 ### Add a UI component
 
-Every [shadcn/ui component](https://ui.shadcn.com/docs/components) is already
-in `src/components/ui`, so you usually just import it:
+Components live in `src/components/ui`. If yours isn't there yet, add it
+from the [shadcn/ui registry](https://ui.shadcn.com/docs/components), then
+import it:
+
+```bash
+pnpm exec shadcn add dialog
+```
 
 ```tsx
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 ```
 
-`pnpm exec shadcn add <name>` adds or updates one from the registry.
+The same command with `--overwrite` updates a component to its latest
+version (review the diff: the code is yours). `pnpm format` puts new files
+in the house style.
 
 ### Check who is signed in
 

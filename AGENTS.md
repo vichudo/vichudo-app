@@ -33,7 +33,8 @@ oxlint and oxfmt. Package manager: pnpm 12.
 
 - `src/app` — routes. Page-only components in `src/app/**/_components`.
 - `src/components` — shared components. `src/components/ui` is vendored
-  shadcn/ui: add with `pnpm exec shadcn add <name>`, do not hand-edit.
+  shadcn/ui: add a missing one with `pnpm exec shadcn add <name>`, then
+  `pnpm format`. Do not hand-edit them.
 - `src/server/api/routers` — tRPC routers; register each in
   `src/server/api/root.ts`.
 - `src/server/auth.ts` — Better Auth config and `getSession()` for Server
