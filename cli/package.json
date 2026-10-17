@@ -12,11 +12,12 @@
     "tailwindcss",
     "trpc"
   ],
-  "homepage": "https://github.com/vichudo/t3-latest#readme",
-  "bugs": "https://github.com/vichudo/t3-latest/issues",
+  "homepage": "https://github.com/vichudo/vichudo-app#readme",
+  "bugs": "https://github.com/vichudo/vichudo-app/issues",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vichudo/t3-latest.git",
+    "url": "git+https://github.com/vichudo/vichudo-app.git",
     "directory": "cli"
   },
   "bin": {
