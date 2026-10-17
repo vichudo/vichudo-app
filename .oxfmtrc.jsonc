@@ -1,0 +1,24 @@
+// Oxfmt: https://oxc.rs/docs/guide/usage/formatter/config
+// Prettier-compatible output. Where oxfmt's default is already the house style
+// (semicolons, trailing commas everywhere, 2-space indent), it stays implicit.
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  // 80 columns, single quotes: the majority style across leading TypeScript
+  // repos (tRPC, TanStack, Prisma). JSX attributes keep double quotes.
+  "printWidth": 80,
+  "singleQuote": true,
+  // Groups: built-ins, packages, `@/` aliases, relative paths. Side-effect
+  // imports (`import 'server-only'`, CSS) are never moved.
+  "sortImports": true,
+  // Same order as prettier-plugin-tailwindcss. Tailwind v4 keeps the theme in
+  // the CSS entry point, so custom tokens (`bg-sidebar`) sort correctly.
+  "sortTailwindcss": {
+    "stylesheet": "./src/styles/globals.css",
+    "functions": ["cn", "cva", "clsx"],
+  },
+  "ignorePatterns": [
+    "pnpm-lock.yaml",
+    "src/generated/**",
+    "prisma/migrations/**",
+  ],
+}

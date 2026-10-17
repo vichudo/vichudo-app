@@ -1,25 +1,31 @@
 import {
   defaultShouldDehydrateQuery,
   QueryClient,
-} from "@tanstack/react-query";
-import SuperJSON from "superjson";
+} from '@tanstack/react-query';
+import superjson from 'superjson';
 
-export const createQueryClient = () =>
+export const makeQueryClient = () =>
   new QueryClient({
     defaultOptions: {
       queries: {
-        // With SSR, we usually want to set some default staleTime
-        // above 0 to avoid refetching immediately on the client
+        // With SSR, keep hydrated data fresh briefly so the client does not
+        // refetch it immediately after the first render.
         staleTime: 30 * 1000,
       },
       dehydrate: {
-        serializeData: SuperJSON.serialize,
+        serializeData: superjson.serialize,
+        // Also send queries still in flight, so a server prefetch streams its
+        // result into the client component that reads it.
         shouldDehydrateQuery: (query) =>
           defaultShouldDehydrateQuery(query) ||
-          query.state.status === "pending",
+          query.state.status === 'pending',
+        // Never swallow errors here: Next.js detects dynamic rendering through
+        // errors thrown while prerendering, and it already redacts error
+        // messages in production.
+        shouldRedactErrors: () => false,
       },
       hydrate: {
-        deserializeData: SuperJSON.deserialize,
+        deserializeData: superjson.deserialize,
       },
     },
   });
