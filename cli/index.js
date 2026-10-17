@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// create-vichudo-app: start a new app from the vichudo/t3-latest template.
+// create-vichudo-app: start a new app from the vichudo/vichudo-app template.
 // No dependencies: it clones the template with git, personalises it, and
 // installs with pnpm.
 
@@ -17,9 +17,11 @@ import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
 import { parseArgs, styleText } from 'node:util';
 
-const TEMPLATE = 'https://github.com/vichudo/t3-latest.git';
-// Template-repo files that do not belong in an app.
-const TEMPLATE_ONLY = ['.git', 'cli'];
+const TEMPLATE = 'https://github.com/vichudo/vichudo-app.git';
+// Template-repo files that do not belong in an app. An app chooses its own
+// license.
+const TEMPLATE_ONLY = ['.git', 'cli', 'LICENSE'];
+const UI_DIR = 'src/components/ui';
 const MIN_NODE_MAJOR = 24;
 // The template's `pnpm db:dev` ports (server, database, shadow database).
 const TEMPLATE_DB_PORTS = [51213, 51214, 51215];
@@ -29,6 +31,8 @@ const HELP = `Usage: pnpm create vichudo-app [directory] [options]
 Options:
   --ref <branch|tag>   Template version to use (default: the default branch)
   --template <url>     Git URL or path of the template (default: ${TEMPLATE})
+  --components <set>   shadcn/ui components to fetch: \`all\` (default) or
+                       \`essentials\`, the ones the template's pages use
   --no-install         Skip \`pnpm install\`
   --no-git             Skip \`git init\` and the first commit
   -y, --yes            Accept defaults without prompting
@@ -36,6 +40,8 @@ Options:
   -v, --version        Show the version`;
 
 class CliError extends Error {}
+
+/** @typedef {'all' | 'essentials'} ComponentSet */
 
 /**
  * A dimmed shell comment for printed commands.
@@ -100,16 +106,35 @@ function editFile(file, transform) {
   writeFileSync(file, transform(readFileSync(file, 'utf8')));
 }
 
-async function promptDirectory() {
+/**
+ * Asks one question on the terminal and returns the trimmed answer.
+ *
+ * @param {string} question
+ */
+async function ask(question) {
   const rl = createInterface({ input: stdin, output: stdout });
   try {
-    const answer = await rl.question(
-      `${styleText('bold', 'Project directory')} ${styleText('dim', '(my-app)')}: `,
-    );
-    return answer.trim() || 'my-app';
+    return (await rl.question(question)).trim();
   } finally {
     rl.close();
   }
+}
+
+async function promptDirectory() {
+  const answer = await ask(
+    `${styleText('bold', 'Project directory')} ${styleText('dim', '(my-app)')}: `,
+  );
+  return answer || 'my-app';
+}
+
+/** @returns {Promise<ComponentSet>} */
+async function promptComponents() {
+  console.info(`
+${styleText('bold', 'shadcn/ui components')}, fetched fresh from the registry:
+  1. All of them ${styleText('dim', '(recommended)')}
+  2. Just the essentials the template's pages use ${styleText('dim', '(add more any time)')}`);
+  const answer = await ask('Choose 1 or 2 (1): ');
+  return answer === '2' ? 'essentials' : 'all';
 }
 
 /**
@@ -188,12 +213,11 @@ function personalise(root, name, ports) {
 }
 
 /**
- * Creates the repository and its first commit; a missing identity is fine.
+ * Commits everything as the app's first commit; a missing identity is fine.
  *
  * @param {string} root
  */
-function initGit(root) {
-  run('git', ['init', '--quiet'], { cwd: root });
+function commitAll(root) {
   run('git', ['add', '--all'], { cwd: root });
   try {
     run(
@@ -218,26 +242,132 @@ function initGit(root) {
 }
 
 /**
- * Installs with pnpm, through Corepack when pnpm itself is not installed.
+ * How to run pnpm here: directly, or through Corepack when pnpm itself is
+ * not installed.
+ *
+ * @returns {string[] | undefined}
+ */
+function findPnpm() {
+  if (hasCommand('pnpm')) return ['pnpm'];
+  if (hasCommand('corepack')) return ['corepack', 'pnpm'];
+  return undefined;
+}
+
+/**
+ * Fetches shadcn/ui components fresh from the registry, so an app never
+ * starts with stale copies: all of them, or just the essentials (the ones
+ * the template ships, refreshed). Then formats them in the house style.
+ * Offline, the template's bundled essentials stay.
  *
  * @param {string} root
+ * @param {string[]} pnpm
+ * @param {ComponentSet} set
  */
-function install(root) {
-  if (hasCommand('pnpm')) {
-    run('pnpm', ['install'], { cwd: root });
-    return true;
-  }
-  if (hasCommand('corepack')) {
-    run('corepack', ['pnpm', 'install'], { cwd: root });
-    return true;
-  }
-  console.warn(
-    styleText(
-      'yellow',
-      'pnpm was not found. Run `corepack enable`, then `pnpm install`.',
-    ),
+function addComponents(root, pnpm, set) {
+  const [command = 'pnpm', ...prefix] = pnpm;
+  const essentials = readdirSync(path.join(root, UI_DIR)).map((file) =>
+    path.basename(file, '.tsx'),
   );
-  return false;
+  console.info(
+    `\nFetching ${set === 'all' ? 'all shadcn/ui components' : `${essentials.length} shadcn/ui components`} from the registry…`,
+  );
+  try {
+    run(
+      command,
+      [
+        ...prefix,
+        'exec',
+        'shadcn',
+        'add',
+        ...(set === 'all' ? ['--all'] : essentials),
+        '--overwrite',
+        '--yes',
+      ],
+      { cwd: root, quiet: true },
+    );
+    run(command, [...prefix, 'exec', 'oxfmt'], { cwd: root, quiet: true });
+  } catch {
+    console.warn(
+      styleText(
+        'yellow',
+        'Could not reach the shadcn/ui registry: kept the bundled essentials. Add more later with `pnpm exec shadcn add <name>`.',
+      ),
+    );
+    return;
+  }
+  const count = readdirSync(path.join(root, UI_DIR)).length;
+  console.info(`Added ${count} components to ${UI_DIR}.`);
+}
+
+/**
+ * The component set from `--components`, or asked for when interactive.
+ *
+ * @param {string | undefined} flag
+ * @param {boolean} interactive
+ * @returns {Promise<ComponentSet>}
+ */
+async function chooseComponents(flag, interactive) {
+  if (flag === 'all' || flag === 'essentials') return flag;
+  if (flag !== undefined) {
+    throw new CliError('--components must be `all` or `essentials`.');
+  }
+  return interactive ? promptComponents() : 'all';
+}
+
+/**
+ * Installs dependencies and fetches the components. Returns whether it
+ * installed: without pnpm, the app is left for the user to install.
+ *
+ * @param {string} root
+ * @param {ComponentSet} components
+ */
+function installApp(root, components) {
+  const pnpm = findPnpm();
+  if (!pnpm) {
+    console.warn(
+      styleText(
+        'yellow',
+        'pnpm was not found. Run `corepack enable`, then `pnpm install`.',
+      ),
+    );
+    return false;
+  }
+  const [command = 'pnpm', ...prefix] = pnpm;
+  run(command, [...prefix, 'install'], { cwd: root });
+  addComponents(root, pnpm, components);
+  return true;
+}
+
+/**
+ * @param {string} root
+ * @param {string} name
+ * @param {boolean} installed
+ * @param {ComponentSet} components
+ */
+function printNextSteps(root, name, installed, components) {
+  const relative = path.relative(process.cwd(), root) || '.';
+  const cd = /\s/.test(relative) ? `"${relative}"` : relative;
+  const firstSteps = [
+    relative === '.' ? '' : `cd ${cd}`,
+    installed ? '' : 'pnpm install',
+    // Components are fetched after installing; without it, only the
+    // template's bundled essentials are there.
+    !installed && components === 'all'
+      ? 'pnpm exec shadcn add --all --yes && pnpm format'
+      : '',
+  ].filter(Boolean);
+
+  console.info(`
+${styleText('green', `Created ${name}.`)} Start it:
+
+${[...firstSteps, `pnpm db:dev                 ${comment('local Postgres, leave it running')}`].map((line) => `  ${line}`).join('\n')}
+
+Then, in a second terminal:
+
+  pnpm db:push && pnpm dev    ${comment('create the tables, start the app')}
+
+Open http://localhost:3000 and create an account. Next steps are in README.md.
+`);
 }
 
 async function main() {
@@ -247,6 +377,7 @@ async function main() {
     options: {
       ref: { type: 'string' },
       template: { type: 'string', default: TEMPLATE },
+      components: { type: 'string' },
       install: { type: 'boolean', default: true },
       git: { type: 'boolean', default: true },
       yes: { type: 'boolean', short: 'y', default: false },
@@ -288,6 +419,7 @@ async function main() {
   if (existsSync(root) && readdirSync(root).length > 0) {
     throw new CliError(`${directory} already exists and is not empty.`);
   }
+  const components = await chooseComponents(values.components, interactive);
 
   console.info(`\nCreating ${styleText('bold', name)} in ${root}\n`);
 
@@ -303,27 +435,13 @@ async function main() {
   personalise(root, name, await pickDatabasePorts());
   // The app's own script writes `.env`, so clones of the app get the same.
   run('node', ['scripts/env-init.mjs'], { cwd: root, quiet: true });
-  if (values.git) initGit(root);
-  const installed = values.install && install(root);
+  // Before installing: husky's `prepare` script installs the git hooks.
+  if (values.git) run('git', ['init', '--quiet'], { cwd: root });
 
-  const relative = path.relative(process.cwd(), root) || '.';
-  const cd = /\s/.test(relative) ? `"${relative}"` : relative;
-  const firstSteps = [
-    relative === '.' ? '' : `cd ${cd}`,
-    installed ? '' : 'pnpm install',
-  ].filter(Boolean);
+  const installed = values.install && installApp(root, components);
+  if (values.git) commitAll(root);
 
-  console.info(`
-${styleText('green', `Created ${name}.`)} Start it:
-
-${[...firstSteps, `pnpm db:dev                 ${comment('local Postgres, leave it running')}`].map((line) => `  ${line}`).join('\n')}
-
-Then, in a second terminal:
-
-  pnpm db:push && pnpm dev    ${comment('create the tables, start the app')}
-
-Open http://localhost:3000 and create an account. Next steps are in README.md.
-`);
+  printNextSteps(root, name, installed, components);
 }
 
 try {

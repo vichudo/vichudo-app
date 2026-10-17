@@ -1,7 +1,7 @@
 # create-vichudo-app
 
 Create a typesafe full-stack app from the
-[vichudo/t3-latest](https://github.com/vichudo/t3-latest) template.
+[vichudo/vichudo-app](https://github.com/vichudo/vichudo-app) template.
 
 ```bash
 pnpm create vichudo-app@latest my-app
@@ -16,8 +16,10 @@ ready), Tailwind CSS 4, shadcn/ui, TypeScript 7, oxlint and oxfmt. The command:
 2. names the package after the directory,
 3. gives it its own local database (`pnpm db:dev`, no Docker) on free ports,
    and writes `.env` with a fresh `BETTER_AUTH_SECRET` pointing at it,
-4. creates a git repository with a first commit,
-5. installs dependencies with pnpm.
+4. installs dependencies with pnpm,
+5. fetches the latest shadcn/ui components from the registry: all of them,
+   or just the essentials the template's pages use (it asks),
+6. creates a git repository with a first commit.
 
 Then:
 
@@ -36,6 +38,7 @@ installed.
 | --------------------- | ----------------------------------------------------- |
 | `--ref <branch\|tag>` | Template version to use (default: the default branch) |
 | `--template <url>`    | Git URL or path of another template, e.g. a fork      |
+| `--components <set>`  | `all` (default) or `essentials`; skips the question   |
 | `--no-install`        | Skip `pnpm install`                                   |
 | `--no-git`            | Skip `git init` and the first commit                  |
 | `-y`, `--yes`         | Accept defaults without prompting                     |
