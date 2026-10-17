@@ -21,7 +21,7 @@
     "directory": "cli"
   },
   "bin": {
-    "create-vichudo-app": "./index.js"
+    "create-vichudo-app": "index.js"
   },
   "files": [
     "index.js"
