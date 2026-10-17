@@ -14,9 +14,18 @@ ready), Tailwind CSS 4, shadcn/ui, TypeScript 7, oxlint and oxfmt. The command:
 
 1. copies the latest template into `my-app`,
 2. names the package after the directory,
-3. writes `.env` with a fresh `BETTER_AUTH_SECRET`,
+3. gives it its own local database (`pnpm db:dev`, no Docker) on free ports,
+   and writes `.env` with a fresh `BETTER_AUTH_SECRET` pointing at it,
 4. creates a git repository with a first commit,
 5. installs dependencies with pnpm.
+
+Then:
+
+```bash
+cd my-app
+pnpm db:dev                # local Postgres, leave it running
+pnpm db:push && pnpm dev   # in a second terminal
+```
 
 Requires Node.js 24+ and git. pnpm is used through Corepack if it is not
 installed.

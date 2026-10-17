@@ -15,5 +15,8 @@ export default defineConfig({
     // variable is unset: `prisma generate` runs on every install (CI, Vercel)
     // and needs no database. Commands that do need one report it missing.
     url: process.env.DATABASE_URL,
+    // `prisma migrate dev` diffs against a scratch database. `pnpm db:dev`
+    // serves one on its own port; elsewhere Prisma creates it on demand.
+    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL,
   },
 });

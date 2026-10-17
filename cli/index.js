@@ -4,7 +4,6 @@
 // installs with pnpm.
 
 import { spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
 import {
   existsSync,
   readdirSync,
@@ -12,6 +11,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer } from 'node:net';
 import path from 'node:path';
 import { stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline/promises';
@@ -21,6 +21,8 @@ const TEMPLATE = 'https://github.com/vichudo/t3-latest.git';
 // Template-repo files that do not belong in an app.
 const TEMPLATE_ONLY = ['.git', 'cli'];
 const MIN_NODE_MAJOR = 24;
+// The template's `pnpm db:dev` ports (server, database, shadow database).
+const TEMPLATE_DB_PORTS = [51213, 51214, 51215];
 
 const HELP = `Usage: pnpm create vichudo-app [directory] [options]
 
@@ -34,6 +36,13 @@ Options:
   -v, --version        Show the version`;
 
 class CliError extends Error {}
+
+/**
+ * A dimmed shell comment for printed commands.
+ *
+ * @param {string} text
+ */
+const comment = (text) => styleText('dim', `# ${text}`);
 
 /**
  * Runs a command, inheriting stdio unless `quiet`. Throws on failure.
@@ -104,29 +113,66 @@ async function promptDirectory() {
 }
 
 /**
- * Points the template at this project: name, database and auth secret.
+ * Whether nothing listens on `port` locally.
+ *
+ * @param {number} port
+ * @returns {Promise<boolean>}
+ */
+function isPortFree(port) {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.once('error', () => resolve(false));
+    server.listen(port, '127.0.0.1', () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
+
+/**
+ * Three consecutive free ports for this app's `pnpm db:dev`, so its local
+ * database never collides with another app's.
+ */
+async function pickDatabasePorts() {
+  const candidates = Array.from({ length: 10 }, () => {
+    const base = 52_000 + Math.floor(Math.random() * 2000) * 3;
+    return [base, base + 1, base + 2];
+  });
+  const free = await Promise.all(
+    candidates.map(async (ports) =>
+      (await Promise.all(ports.map(isPortFree))).every(Boolean),
+    ),
+  );
+  const ports = candidates[free.indexOf(true)];
+  if (!ports) throw new CliError('Found no free ports for the local database.');
+  return ports;
+}
+
+/**
+ * Points the template at this project: package name and its own local
+ * database (`pnpm db:dev` server name and ports, mirrored in `.env.example`).
  *
  * @param {string} root
  * @param {string} name
+ * @param {number[]} ports server, database and shadow database ports
  */
-function personalise(root, name) {
+function personalise(root, name, ports) {
   editFile(path.join(root, 'package.json'), (source) => {
-    const pkg = /** @type {Record<string, unknown>} */ (JSON.parse(source));
-    return `${JSON.stringify({ ...pkg, name }, null, 2)}\n`;
+    const pkg = /** @type {{ scripts: Record<string, string> }} */ (
+      JSON.parse(source)
+    );
+    const [server, database, shadow] = ports;
+    const scripts = {
+      ...pkg.scripts,
+      'db:dev': `prisma dev --name ${name} --port ${server} --db-port ${database} --shadow-db-port ${shadow}`,
+    };
+    return `${JSON.stringify({ ...pkg, name, scripts }, null, 2)}\n`;
   });
 
-  // The template's database name doubles as `start-database.sh`'s container
-  // name, so give every app its own.
-  const envExample = path.join(root, '.env.example');
-  editFile(envExample, (source) =>
-    source.replace('localhost:5432/t3-latest"', `localhost:5432/${name}"`),
-  );
-  const secret = randomBytes(32).toString('base64url');
-  writeFileSync(
-    path.join(root, '.env'),
-    readFileSync(envExample, 'utf8').replace(
-      'BETTER_AUTH_SECRET=""',
-      `BETTER_AUTH_SECRET="${secret}"`,
+  editFile(path.join(root, '.env.example'), (source) =>
+    TEMPLATE_DB_PORTS.reduce(
+      (text, port, index) =>
+        text.replaceAll(`localhost:${port}/`, `localhost:${ports[index]}/`),
+      source,
     ),
   );
 
@@ -254,20 +300,29 @@ async function main() {
     rmSync(path.join(root, entry), { recursive: true, force: true });
   }
 
-  personalise(root, name);
+  personalise(root, name, await pickDatabasePorts());
+  // The app's own script writes `.env`, so clones of the app get the same.
+  run('node', ['scripts/env-init.mjs'], { cwd: root, quiet: true });
   if (values.git) initGit(root);
   const installed = values.install && install(root);
 
   const relative = path.relative(process.cwd(), root) || '.';
   const cd = /\s/.test(relative) ? `"${relative}"` : relative;
+  const firstSteps = [
+    relative === '.' ? '' : `cd ${cd}`,
+    installed ? '' : 'pnpm install',
+  ].filter(Boolean);
+
   console.info(`
-${styleText('green', 'Done.')} Next steps:
+${styleText('green', `Created ${name}.`)} Start it:
 
-${relative === '.' ? '' : `  cd ${cd}\n`}${installed ? '' : '  pnpm install\n'}  pnpm db:dev       ${styleText('dim', '# local Postgres; copy its postgres:// URL into .env')}
-  pnpm db:push
-  pnpm dev
+${[...firstSteps, `pnpm db:dev                 ${comment('local Postgres, leave it running')}`].map((line) => `  ${line}`).join('\n')}
 
-${styleText('dim', '.env already has a fresh BETTER_AUTH_SECRET. Google sign-in: see README → Auth.')}
+Then, in a second terminal:
+
+  pnpm db:push && pnpm dev    ${comment('create the tables, start the app')}
+
+Open http://localhost:3000 and create an account. Next steps are in README.md.
 `);
 }
 

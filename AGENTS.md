@@ -16,7 +16,9 @@ oxlint and oxfmt. Package manager: pnpm 12.
 
 ## Commands
 
-- `pnpm dev` — dev server on http://localhost:3000.
+- `pnpm dev` — dev server on http://localhost:3000. It needs the database:
+  `pnpm db:dev` runs this app's local Postgres (keep it running), and
+  `.env` already points at it. `pnpm env:init` creates a missing `.env`.
 - `pnpm check` — format check, lint, typecheck, tests. Run it before you say
   a change is done.
 - `pnpm lint:fix` / `pnpm format` — apply autofixes and formatting.
