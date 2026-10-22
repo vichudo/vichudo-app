@@ -218,6 +218,12 @@ function portPattern(port) {
  * @param {number[]} ports server, database and shadow database ports
  */
 function personalise(root, name, ports) {
+  /**
+   * Template port → this app's port, for each port `db:dev` uses.
+   *
+   * @type {Map<number, number>}
+   */
+  const moved = new Map();
   editFile(path.join(root, 'package.json'), (source) => {
     const pkg = /** @type {{ scripts: Record<string, string> }} */ (
       JSON.parse(source)
@@ -226,31 +232,33 @@ function personalise(root, name, ports) {
     // Renames the template's own command and moves it to the free ports,
     // rather than writing one: this CLI then fits any template version,
     // whichever Prisma CLI it runs.
-    const dbDev = scripts['db:dev'] ?? '';
-    if (
-      /--name \S+/.test(dbDev) &&
-      TEMPLATE_DB_PORTS.every((port) => portPattern(port).test(dbDev))
-    ) {
-      scripts['db:dev'] = TEMPLATE_DB_PORTS.reduce(
-        (script, port, index) =>
-          script.replace(portPattern(port), String(ports[index])),
-        dbDev.replace(/--name \S+/, `--name ${name}`),
-      );
-    } else {
+    const template = scripts['db:dev'] ?? '';
+    let dbDev = template;
+    const named = /--name \S+/.test(dbDev);
+    dbDev = dbDev.replace(/--name \S+/, `--name ${name}`);
+    for (const [index, port] of TEMPLATE_DB_PORTS.entries()) {
+      const to = ports[index];
+      if (to === undefined || !portPattern(port).test(dbDev)) continue;
+      dbDev = dbDev.replace(portPattern(port), String(to));
+      moved.set(port, to);
+    }
+    if (!named || moved.size < TEMPLATE_DB_PORTS.length) {
       console.warn(
         styleText(
           'yellow',
-          "Kept the template's `db:dev` script as it is: it has no database name and ports to personalise.",
+          "The template's `db:dev` script has an unexpected shape: check its database name and ports.",
         ),
       );
     }
+    if (template) scripts['db:dev'] = dbDev;
     return `${JSON.stringify({ ...pkg, name, scripts }, null, 2)}\n`;
   });
 
+  // `.env.example` follows the ports `db:dev` actually moved.
   editFile(path.join(root, '.env.example'), (source) =>
-    TEMPLATE_DB_PORTS.reduce(
-      (text, port, index) =>
-        text.replaceAll(`localhost:${port}/`, `localhost:${ports[index]}/`),
+    [...moved].reduce(
+      (text, [from, to]) =>
+        text.replaceAll(`localhost:${from}/`, `localhost:${to}/`),
       source,
     ),
   );
