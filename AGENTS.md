@@ -29,9 +29,11 @@ checked by TypeScript 7, oxlint and oxfmt. Package manager: pnpm 12.
   leaves the database at a state no migration reaches, and the next plan
   fails with `MIGRATION.HASH_NOT_IN_GRAPH`. To recover, `pnpm db:push` (so
   the database matches the contract; `db:migrate` refuses a database no
-  migration produced), then `pnpm db:plan --name <x> --from <folder>` with
-  the newest migration's folder, then `pnpm db:migrate`. `db:push`, `db:plan`, `db:migrate` and `db:deploy` emit
-  the contract's types first (`pnpm db:generate` alone).
+  migration produced), then `pnpm db:plan --name <x> --from <name>` with the
+  newest folder's name in `prisma/migrations/app` (a path fails with
+  `MIGRATION.REF_NOT_FOUND`), then `pnpm db:migrate`. `db:push`, `db:plan`,
+  `db:migrate` and `db:deploy` emit the contract's types first
+  (`pnpm db:generate` alone).
 - Every timestamp in the contract is `TimestamptzJsDate` (or
   `temporal.createdAtJsDate()` / `temporal.updatedAtJsDate()`): a `Date`, as
   Better Auth and superjson expect. `DateTime`, `Timestamptz`, `Date`, `Time`
@@ -43,7 +45,9 @@ checked by TypeScript 7, oxlint and oxfmt. Package manager: pnpm 12.
   Prisma does not read). Port its `git diff` into `prisma/contract.prisma`
   as its header says. Change the `User`, `Session`, `Account` and
   `Verification` models only that way, and never run `auth migrate`: Prisma
-  owns these tables, even when Better Auth's schema check suggests it.
+  owns these tables, even when Better Auth's schema check suggests it. That
+  check runs once per server and keeps a failure: restart `pnpm dev` after
+  applying auth tables. Other contract changes reload without a restart.
 
 ## Where things go
 

@@ -168,8 +168,9 @@ to `prisma/migrations` for review, and `pnpm db:migrate` applies it. From the
 first migration on, stay with `db:plan` and `db:migrate`: a `db:push` change
 has no migration, so the next plan cannot start from it. If that happens,
 run `pnpm db:push` so the database matches the contract, plan from the
-newest migration's folder with `pnpm db:plan --name add_tags --from <folder>`,
-then run `pnpm db:migrate`.
+newest migration with `pnpm db:plan --name add_tags --from <name>`, where
+`<name>` is the newest folder's name in `prisma/migrations/app` (the name
+only, not its path), then run `pnpm db:migrate`.
 
 Type timestamps as `TimestamptzJsDate`, like the existing models: Prisma 8's
 `DateTime` is a `Temporal.Instant`, and Node.js 24 has no `Temporal`, so such
@@ -231,8 +232,9 @@ apply it as in [Change the database](#change-the-database): `pnpm db:push`,
 or `pnpm db:plan --name <plugin>` and `pnpm db:migrate` once the app has
 migrations. While developing, Better Auth checks its tables before
 the first request and names any that are missing (skip its `auth migrate`
-hint: Prisma manages the tables). Password reset and email
-verification need an email sender; the spot is marked in
+hint: Prisma manages the tables). It keeps a failed check until the server
+restarts, so restart `pnpm dev` once the tables are in. Password reset and
+email verification need an email sender; the spot is marked in
 `src/server/auth.ts`.
 
 ### Deploy
