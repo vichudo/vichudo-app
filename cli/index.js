@@ -29,7 +29,8 @@ const TEMPLATE_ONLY = [
   '.github/workflows/create-app.yml',
 ];
 const UI_DIR = 'src/components/ui';
-const MIN_NODE_MAJOR = 24;
+// The template's oldest Node.js (its `engines`): Prisma's CLI needs 24.11.
+const MIN_NODE = { major: 24, minor: 11 };
 // The template's `pnpm db:dev` ports (server, database, shadow database).
 const TEMPLATE_DB_PORTS = [51213, 51214, 51215];
 // Commands installed as `.cmd` shims on Windows.
@@ -215,7 +216,7 @@ function personalise(root, name, ports) {
     const [server, database, shadow] = ports;
     const scripts = {
       ...pkg.scripts,
-      'db:dev': `prisma dev --name ${name} --port ${server} --db-port ${database} --shadow-db-port ${shadow}`,
+      'db:dev': `prisma7 dev --name ${name} --port ${server} --db-port ${database} --shadow-db-port ${shadow}`,
     };
     return `${JSON.stringify({ ...pkg, name, scripts }, null, 2)}\n`;
   });
@@ -422,14 +423,22 @@ function parseOptions() {
   }
 }
 
-async function main() {
-  // First: older Node.js versions fail on the option parser below.
-  const nodeMajor = Number(process.versions.node.split('.')[0]);
-  if (nodeMajor < MIN_NODE_MAJOR) {
+/** Stops on a Node.js older than the template supports. */
+function assertNodeVersion() {
+  const [major = 0, minor = 0] = process.versions.node.split('.').map(Number);
+  if (
+    major < MIN_NODE.major ||
+    (major === MIN_NODE.major && minor < MIN_NODE.minor)
+  ) {
     throw new CliError(
-      `Node.js ${MIN_NODE_MAJOR} or newer is required; this is ${process.versions.node}.`,
+      `Node.js ${MIN_NODE.major}.${MIN_NODE.minor} or newer is required; this is ${process.versions.node}.`,
     );
   }
+}
+
+async function main() {
+  // First: older Node.js versions fail on the option parser below.
+  assertNodeVersion();
 
   const { values, positionals } = parseOptions();
 
