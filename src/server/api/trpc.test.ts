@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import { describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 
 import {
   createTRPCContext,
@@ -53,30 +54,57 @@ describe('error messages sent to clients', () => {
     refuse: publicProcedure.query(() => {
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Not your post.' });
     }),
+    // A schema failing inside a procedure, like a bad `.output()`.
+    misparse: publicProcedure.query(() =>
+      z.object({ secretField: z.number() }).parse({ secretField: 'x' }),
+    ),
+    named: publicProcedure
+      .input(z.object({ name: z.string().min(1, 'Give it a name.') }))
+      .query(({ input }) => input.name),
   });
 
   /** Calls a query over HTTP, as a Client Component would. */
-  async function errorMessage(path: string) {
+  async function callError(path: string, input?: unknown) {
+    const query =
+      input === undefined
+        ? ''
+        : `?input=${encodeURIComponent(JSON.stringify({ json: input }))}`;
     const response = await fetchRequestHandler({
       endpoint: '/api/trpc',
-      req: new Request(`http://localhost/api/trpc/${path}`),
+      req: new Request(`http://localhost/api/trpc/${path}${query}`),
       router,
       createContext: () =>
         createTRPCContext({ headers: new Headers(), session: null }),
     });
     const body = (await response.json()) as {
-      error: { json: { message: string } };
+      error: {
+        json: {
+          message: string;
+          data: { zodError: { fieldErrors: Record<string, string[]> } | null };
+        };
+      };
     };
-    return body.error.json.message;
+    return body.error.json;
   }
 
   it('hides the cause of an unexpected error', async () => {
-    await expect(errorMessage('crash')).resolves.toBe(
-      'Something went wrong. Try again.',
-    );
+    const error = await callError('crash');
+    expect(error.message).toBe('Something went wrong. Try again.');
   });
 
   it("keeps a procedure's own message", async () => {
-    await expect(errorMessage('refuse')).resolves.toBe('Not your post.');
+    const error = await callError('refuse');
+    expect(error.message).toBe('Not your post.');
+  });
+
+  it('hides the schema of a Zod error inside a procedure', async () => {
+    const error = await callError('misparse');
+    expect(error.message).toBe('Something went wrong. Try again.');
+    expect(error.data.zodError).toBeNull();
+  });
+
+  it('sends input validation errors by field', async () => {
+    const error = await callError('named', { name: '' });
+    expect(error.data.zodError?.fieldErrors.name).toEqual(['Give it a name.']);
   });
 });

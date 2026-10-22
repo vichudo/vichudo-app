@@ -47,15 +47,20 @@ export const createTRPCContext = async (opts: {
 const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
   errorFormatter({ shape, error }) {
-    // Keyed by input field, so the client can read `fieldErrors.name`.
+    // Keyed by input field, so the client can read `fieldErrors.name`. Only
+    // for invalid input: a Zod error inside a procedure (`.output()`, parsing
+    // a response) is a bug, and its schema is nobody's business.
     const zodError: z.core.$ZodFlattenedError<Record<string, unknown>> | null =
-      error.cause instanceof ZodError ? z.flattenError(error.cause) : null;
+      error.code === 'BAD_REQUEST' && error.cause instanceof ZodError
+        ? z.flattenError(error.cause)
+        : null;
 
     return {
       ...shape,
-      // An unexpected error (a failed query, a bug) carries its cause's
-      // message, which can expose internals. In production the client gets a
-      // generic one; the route handler logs the original.
+      // Every INTERNAL_SERVER_ERROR (any error that is not a TRPCError, or
+      // one thrown with that code) can carry internals in its message. In
+      // production the client gets a generic one; the route handler logs the
+      // original.
       message:
         error.code === 'INTERNAL_SERVER_ERROR' && env.NODE_ENV === 'production'
           ? 'Something went wrong. Try again.'

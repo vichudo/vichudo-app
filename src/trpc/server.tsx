@@ -3,10 +3,12 @@ import {
   dehydrate,
   HydrationBoundary,
   noop,
+  type InfiniteQueryExecuteOptions,
   type QueryExecuteOptions,
   type QueryKey,
 } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
+import { io } from 'next/cache';
 import { headers } from 'next/headers';
 import { cache } from 'react';
 
@@ -48,8 +50,17 @@ export const trpc = createTRPCOptionsProxy({
  */
 export const caller = createCaller(createContext);
 
-/** Sends this request's prefetched queries to the client components below. */
-export function HydrateClient({ children }: { children: React.ReactNode }) {
+/**
+ * Sends this request's prefetched queries to the client components below.
+ * Render it inside `<Suspense>`: `dehydrate` stamps each query with the
+ * current time, which Cache Components allows only at request time (`io()`).
+ */
+export async function HydrateClient({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  await io();
   return (
     <HydrationBoundary state={dehydrate(getQueryClient())}>
       {children}
@@ -81,4 +92,33 @@ export function prefetch<
   // A failure is not lost: it is dehydrated with the query and rethrown by
   // the client component that reads it, into the nearest error boundary.
   void getQueryClient().query(queryOptions).catch(noop);
+}
+
+/**
+ * `prefetch` for paginated data, read with `useSuspenseInfiniteQuery`.
+ *
+ * @example
+ * prefetchInfinite(
+ *   trpc.post.list.infiniteQueryOptions(
+ *     { limit: 10 },
+ *     { getNextPageParam: (page) => page.nextCursor },
+ *   ),
+ * );
+ */
+export function prefetchInfinite<
+  TQueryFnData,
+  TError,
+  TData,
+  TQueryKey extends QueryKey,
+  TPageParam,
+>(
+  queryOptions: InfiniteQueryExecuteOptions<
+    TQueryFnData,
+    TError,
+    TData,
+    TQueryKey,
+    TPageParam
+  >,
+) {
+  void getQueryClient().infiniteQuery(queryOptions).catch(noop);
 }

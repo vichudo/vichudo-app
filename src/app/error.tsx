@@ -1,5 +1,6 @@
 'use client';
 
+import { useQueryErrorResetBoundary } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,10 @@ export default function ErrorPage({
   error: unknown;
   retry: () => void;
 }) {
+  // A query that failed stays in the cache as an error; without a reset, its
+  // component would throw it again instead of fetching.
+  const { reset } = useQueryErrorResetBoundary();
+
   useEffect(() => {
     console.error(error);
   }, [error]);
@@ -36,7 +41,13 @@ export default function ErrorPage({
           </CardDescription>
         </CardHeader>
         <CardFooter className="justify-end">
-          <Button type="button" onClick={() => retry()}>
+          <Button
+            type="button"
+            onClick={() => {
+              reset();
+              retry();
+            }}
+          >
             Try again
           </Button>
         </CardFooter>
