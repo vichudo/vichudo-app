@@ -120,6 +120,8 @@ checked by TypeScript 7, oxlint and oxfmt. Package manager: pnpm 12.
   and `pnpm db:studio` (`prisma7.config.ts`): Prisma 8's `prisma dev` runs
   Prisma Composer instead, and it has no Studio yet.
 - Better Auth runs on the shared `pg` pool through its built-in Kysely
-  adapter: its Prisma adapter supports Prisma 5 to 7 only.
+  adapter: its Prisma adapter supports Prisma 5 to 7 only. `pg` and
+  `@types/pg` are versioned in the `catalog` of `pnpm-workspace.yaml`, which
+  also makes Prisma use the app's copy.
 - oxlint runs type-aware rules through `oxlint-tsgolint`. Fix findings rather
   than disabling them; a disable needs a reason and an exact rule name.

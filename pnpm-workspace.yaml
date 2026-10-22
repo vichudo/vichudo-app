@@ -19,9 +19,13 @@ allowBuilds:
 
 # One `pg` for the app: Prisma pins its own, but runs on the app's pool
 # (`src/server/db.ts`), so a second copy only brings a clashing `Pool` type.
+# The versions live in the catalog, which `package.json` refers to too.
+catalog:
+  pg: ^8.23.1
+  '@types/pg': ^8.23.1
 overrides:
-  pg: $pg
-  '@types/pg': $@types/pg
+  pg: 'catalog:'
+  '@types/pg': 'catalog:'
 
 # What else dependencies may do. tRPC and Prisma ship agent skills that
 # document the installed version; pnpm links them into `.claude/skills`
