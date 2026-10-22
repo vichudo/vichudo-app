@@ -81,5 +81,10 @@ oxlint and oxfmt. Package manager: pnpm 12.
 - pnpm refuses releases younger than a day (`minimumReleaseAge`). If an
   install fails on a brand-new version, wait or pick the previous one; do not
   add exclusions.
+- `@types/node` tracks Node.js 24, the oldest version `engines` allows:
+  newer typings accept APIs that crash on Node.js 24. Raise both together.
+- `prisma`, `@prisma/client` and `@prisma/adapter-pg` share one version.
+  Check `@prisma/client`'s `latest` before bumping: `prisma`'s can point at a
+  prerelease with no matching client.
 - oxlint runs type-aware rules through `oxlint-tsgolint`. Fix findings rather
   than disabling them; a disable needs a reason and an exact rule name.

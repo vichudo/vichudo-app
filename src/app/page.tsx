@@ -21,9 +21,10 @@ import { caller, HydrateClient, prefetch, trpc } from '@/trpc/server';
 
 const links = [
   {
-    href: 'https://create.t3.gg/en/usage/first-steps',
+    // This template's own guide: T3's first steps set up NextAuth and Docker.
+    href: 'https://github.com/vichudo/vichudo-app#how-do-i',
     title: 'First steps',
-    description: 'Set up the database and authentication.',
+    description: 'Add an endpoint, change the database, turn on Google.',
   },
   {
     href: 'https://create.t3.gg/en/introduction',

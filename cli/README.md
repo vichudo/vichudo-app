@@ -42,3 +42,5 @@ installed.
 | `--no-install`        | Skip `pnpm install`                                   |
 | `--no-git`            | Skip `git init` and the first commit                  |
 | `-y`, `--yes`         | Accept defaults without prompting                     |
+| `-h`, `--help`        | Show the options                                      |
+| `-v`, `--version`     | Show the version                                      |
