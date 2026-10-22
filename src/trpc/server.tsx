@@ -7,12 +7,12 @@ import {
   type QueryKey,
 } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
-import { io } from 'next/cache';
 import { headers } from 'next/headers';
 import { cache } from 'react';
 
 import { appRouter, createCaller } from '@/server/api/root';
 import { createTRPCContext } from '@/server/api/trpc';
+import { getSession } from '@/server/auth';
 import { makeQueryClient } from '@/trpc/query-client';
 
 /**
@@ -20,12 +20,13 @@ import { makeQueryClient } from '@/trpc/query-client';
  * request.
  */
 const createContext = cache(async () => {
-  // Reading the session needs request-time values (see `getSession`).
-  await io();
+  // `getSession` is cached per request: a render that reads the session and
+  // calls tRPC looks it up once.
+  const session = await getSession();
   const heads = new Headers(await headers());
   heads.set('x-trpc-source', 'rsc');
 
-  return createTRPCContext({ headers: heads });
+  return createTRPCContext({ headers: heads, session });
 });
 
 /** One query client per request, shared by every prefetch in the render. */
