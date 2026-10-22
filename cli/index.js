@@ -201,6 +201,15 @@ async function pickDatabasePorts() {
 }
 
 /**
+ * A port number as a whole word, e.g. in a script's arguments.
+ *
+ * @param {number} port
+ */
+function portPattern(port) {
+  return new RegExp(`\\b${port}\\b`, 'g');
+}
+
+/**
  * Points the template at this project: package name and its own local
  * database (`pnpm db:dev` server name and ports, mirrored in `.env.example`).
  *
@@ -213,11 +222,28 @@ function personalise(root, name, ports) {
     const pkg = /** @type {{ scripts: Record<string, string> }} */ (
       JSON.parse(source)
     );
-    const [server, database, shadow] = ports;
-    const scripts = {
-      ...pkg.scripts,
-      'db:dev': `prisma7 dev --name ${name} --port ${server} --db-port ${database} --shadow-db-port ${shadow}`,
-    };
+    const scripts = { ...pkg.scripts };
+    // Renames the template's own command and moves it to the free ports,
+    // rather than writing one: this CLI then fits any template version,
+    // whichever Prisma CLI it runs.
+    const dbDev = scripts['db:dev'] ?? '';
+    if (
+      /--name \S+/.test(dbDev) &&
+      TEMPLATE_DB_PORTS.every((port) => portPattern(port).test(dbDev))
+    ) {
+      scripts['db:dev'] = TEMPLATE_DB_PORTS.reduce(
+        (script, port, index) =>
+          script.replace(portPattern(port), String(ports[index])),
+        dbDev.replace(/--name \S+/, `--name ${name}`),
+      );
+    } else {
+      console.warn(
+        styleText(
+          'yellow',
+          "Kept the template's `db:dev` script as it is: it has no database name and ports to personalise.",
+        ),
+      );
+    }
     return `${JSON.stringify({ ...pkg, name, scripts }, null, 2)}\n`;
   });
 
