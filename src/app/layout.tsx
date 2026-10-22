@@ -4,7 +4,6 @@ import { ThemeProvider } from 'next-themes';
 import { Geist, Geist_Mono } from 'next/font/google';
 
 import { Toaster } from '@/components/ui/toast';
-import { TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { TRPCReactProvider } from '@/trpc/client';
 
@@ -26,6 +25,8 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   subsets: ['latin'],
   variable: '--font-mono',
+  // Loaded when monospace text renders, not preloaded on every route.
+  preload: false,
 });
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
@@ -44,9 +45,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           disableTransitionOnChange
         >
           <TRPCReactProvider>
-            <TooltipProvider>
-              <Toaster>{children}</Toaster>
-            </TooltipProvider>
+            <Toaster>{children}</Toaster>
           </TRPCReactProvider>
         </ThemeProvider>
       </body>
