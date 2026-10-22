@@ -1,25 +1,42 @@
-import { PrismaPg } from '@prisma/adapter-pg';
+import postgres from '@prisma/orm-postgres/runtime';
+import { Pool } from 'pg';
 
 import { env } from '@/env';
-import { PrismaClient } from '@/generated/prisma/client';
+import type { Contract } from '@/generated/prisma/contract.d';
+import contractJson from '@/generated/prisma/contract.json' with { type: 'json' };
 
-const createPrismaClient = () =>
-  new PrismaClient({
-    adapter: new PrismaPg({
-      connectionString: env.DATABASE_URL,
-      // Fail instead of hanging when the database is unreachable or every
-      // pooled connection is busy (Prisma 6 gave up after 5–10 s too).
-      connectionTimeoutMillis: 10_000,
-    }),
-    log:
-      env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+const createPool = () => {
+  const pool = new Pool({
+    connectionString: env.DATABASE_URL,
+    // Fail instead of hanging when the database is unreachable or every
+    // pooled connection is busy.
+    connectionTimeoutMillis: 10_000,
   });
-
-// One client, and one connection pool, per process. Next.js loads pages and
-// route handlers as separate module graphs, and development reloads modules:
-// a module-level client alone would open a pool for each.
-const globalForPrisma = globalThis as unknown as {
-  prisma: ReturnType<typeof createPrismaClient> | undefined;
+  // A pooled connection that drops while idle emits `error` on the pool;
+  // unhandled, it would crash the process.
+  pool.on('error', (error) => {
+    console.error('Postgres pool:', error);
+  });
+  return pool;
 };
 
-export const db = (globalForPrisma.prisma ??= createPrismaClient());
+// One pool per process, shared by Prisma and Better Auth. Next.js loads pages
+// and route handlers as separate module graphs, and development reloads
+// modules: a module-level pool alone would open one for each.
+const globalForDb = globalThis as unknown as { pool: Pool | undefined };
+
+export const pool = (globalForDb.pool ??= createPool());
+
+/**
+ * The Prisma ORM client, typed by `prisma/contract.prisma`: query models
+ * through `db.orm.public.<Model>`.
+ *
+ * @see https://www.prisma.io/docs/orm/reference/orm-client
+ */
+export const db = postgres<Contract>({
+  contractJson,
+  pg: pool,
+  // Prisma reports problems only through `log`, silently by default: say, a
+  // database whose schema does not match the contract (a migration not run).
+  log: console,
+});

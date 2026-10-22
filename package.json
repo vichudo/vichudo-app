@@ -4,23 +4,24 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "auth:generate": "auth generate --config src/server/auth.ts --output prisma/schema.prisma --yes",
+    "auth:generate": "auth generate --config src/server/auth.ts --adapter prisma --dialect postgresql --output prisma/auth.generated.prisma --yes",
     "auth:secret": "auth secret",
     "build": "next build",
     "check": "oxfmt --check && oxlint && pnpm typecheck && vitest run",
-    "db:deploy": "prisma migrate deploy",
-    "db:dev": "prisma dev --name vichudo-app --port 51213 --db-port 51214 --shadow-db-port 51215",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma generate && prisma migrate dev",
-    "db:push": "prisma generate && prisma db push",
-    "db:studio": "prisma studio",
+    "db:deploy": "prisma db migrate",
+    "db:dev": "prisma7 dev --name vichudo-app --port 51213 --db-port 51214 --shadow-db-port 51215",
+    "db:generate": "prisma contract emit",
+    "db:migrate": "prisma db migrate --advance-ref db",
+    "db:plan": "prisma contract emit && prisma migration plan",
+    "db:push": "prisma contract emit && prisma db update",
+    "db:studio": "prisma7 studio",
     "dev": "next dev",
     "env:init": "node scripts/env-init.mjs",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma contract emit",
     "prepare": "husky",
     "preview": "next build && next start",
     "start": "next start",
@@ -30,8 +31,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
-    "@prisma/adapter-pg": "^7.10.1",
-    "@prisma/client": "^7.10.1",
+    "@prisma/orm-postgres": "8.0.0-rc.18",
     "@t3-oss/env-nextjs": "^0.13.11",
     "@tanstack/react-query": "^5.104.5",
     "@trpc/client": "^11.19.0",
@@ -53,6 +53,7 @@
   },
   "devDependencies": {
     "@next/env": "^16.4.2",
+    "@prisma/prisma7": "7.10.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^24.19.2",
     "@types/pg": "^8.23.1",
@@ -66,7 +67,7 @@
     "oxlint": "1.89.0",
     "oxlint-tsgolint": "7.0.2004",
     "postcss": "^8.5.31",
-    "prisma": "^7.10.1",
+    "prisma": "8.0.0-rc.24",
     "shadcn": "^4.22.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
@@ -80,7 +81,7 @@
     "*.{json,jsonc,css,md,yml,yaml}": "oxfmt --no-error-on-unmatched-pattern"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24.11"
   },
   "packageManager": "pnpm@12.14.0"
 }
