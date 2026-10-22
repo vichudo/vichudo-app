@@ -1,0 +1,46 @@
+# Tests this template's CLI, so `create-vichudo-app` leaves this file out of
+# the apps it creates: they have no `cli/` to run.
+name: Create app
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # Daily: created apps fetch shadcn/ui components fresh from the registry,
+  # so a registry change can break them without any change here.
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only token: no job here writes to the repository.
+permissions:
+  contents: read
+
+jobs:
+  create-app:
+    name: create-vichudo-app (${{ matrix.components }} components)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        components: [all, essentials]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      # Create an app from this commit, exactly as `pnpm create vichudo-app`
+      # would from GitHub, then hold it to the same bar as the template.
+      - run: >-
+          node cli/index.js "$RUNNER_TEMP/smoke-app"
+          --template "file://$GITHUB_WORKSPACE"
+          --components ${{ matrix.components }} --yes --no-git
+      - run: pnpm check && pnpm build
+        working-directory: ${{ runner.temp }}/smoke-app

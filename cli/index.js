@@ -21,7 +21,13 @@ import { parseArgs, styleText } from 'node:util';
 const TEMPLATE = 'https://github.com/vichudo/vichudo-app.git';
 // Template-repo files that do not belong in an app. An app chooses its own
 // license.
-const TEMPLATE_ONLY = ['.git', 'cli', 'LICENSE'];
+const TEMPLATE_ONLY = [
+  '.git',
+  'cli',
+  'LICENSE',
+  // Runs the CLI, which apps do not have.
+  '.github/workflows/create-app.yml',
+];
 const UI_DIR = 'src/components/ui';
 const MIN_NODE_MAJOR = 24;
 // The template's `pnpm db:dev` ports (server, database, shadow database).
@@ -130,6 +136,12 @@ async function ask(question) {
   const rl = createInterface({ input: stdin, output: stdout });
   try {
     return (await rl.question(question)).trim();
+  } catch (error) {
+    // Ctrl+C or Ctrl+D at the prompt: a cancel, not a crash.
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new CliError('Cancelled.', { cause: error });
+    }
+    throw error;
   } finally {
     rl.close();
   }
