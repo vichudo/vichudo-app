@@ -16,7 +16,7 @@ export const env = createEnv({
    * missing or malformed value fails the build instead of a request.
    */
   server: {
-    // Signs sessions and tokens. Generate one with `pnpm exec auth secret`.
+    // Signs sessions and tokens. Generate one with `pnpm auth:secret`.
     BETTER_AUTH_SECRET: requiredInProduction(z.string().min(32)),
     // The app's public URL. Inferred from the request when unset.
     BETTER_AUTH_URL: z.url().optional(),

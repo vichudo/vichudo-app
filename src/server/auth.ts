@@ -17,7 +17,7 @@ const google =
 /**
  * Better Auth: email and password by default, Google when configured.
  * After changing options or plugins that add tables, regenerate the schema
- * (see README → Auth).
+ * with `pnpm auth:generate` (see README → Add more auth features).
  *
  * @see https://www.better-auth.com/docs/reference/options
  */

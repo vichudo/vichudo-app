@@ -17,10 +17,12 @@ model Post {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  createdBy   User   @relation(fields: [createdById], references: [id])
+  // A user's posts go with them, like their sessions and accounts.
+  createdBy   User   @relation(fields: [createdById], references: [id], onDelete: Cascade)
   createdById String
 
-  @@index([name])
+  // Serves `post.getLatest`: one user's posts, newest first.
+  @@index([createdById, createdAt])
   @@map("post")
 }
 

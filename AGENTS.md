@@ -68,8 +68,10 @@ oxlint and oxfmt. Package manager: pnpm 12.
 - Sign-in, sign-up and sign-out go through `authClient`; after any of them,
   clear the query cache (`queryClient.clear()`) so one user's data never
   shows for the next.
-- Throw `TRPCError` from procedures. Validation messages in Zod schemas are
-  shown to users, so write them as sentences.
+- Throw `TRPCError` from procedures. Its message and validation messages in
+  Zod schemas are shown to users, so write them as sentences. Any other
+  error is logged, and in production reaches the client as a generic
+  message.
 
 ## Tooling notes
 
