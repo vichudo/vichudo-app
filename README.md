@@ -30,8 +30,9 @@ and `--ref` to pin a template version. The CLI's source is in
 
 ## Quick start
 
-You need [Node.js 24+](https://nodejs.org) and pnpm (`corepack enable`
-provides the exact version this project pins).
+You need [Node.js 24+](https://nodejs.org) (`nvm use` or `fnm use` reads
+`.nvmrc`) and pnpm (`corepack enable` provides the exact version this
+project pins).
 
 ```bash
 pnpm install

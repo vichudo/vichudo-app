@@ -14,6 +14,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only token: no job here writes to the repository.
+permissions:
+  contents: read
+
 jobs:
   check:
     name: Format, lint, typecheck, test, build
@@ -25,19 +29,28 @@ jobs:
       # Better Auth refuses its default secret in production builds. A
       # placeholder for CI only; real deployments set their own.
       BETTER_AUTH_SECRET: ci-placeholder-secret-never-used-for-real-sessions
+      # Otherwise Better Auth warns once per build worker that it is unset.
+      BETTER_AUTH_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v7
       # Installs the pnpm version pinned in package.json `packageManager`.
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
       - run: pnpm lint --format github
       - run: pnpm typecheck
       - run: pnpm test
+      # Turbopack's build cache: a warm build redoes only what changed.
+      # https://nextjs.org/docs/app/guides/ci-build-caching
+      - uses: actions/cache@v6
+        with:
+          path: .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('src/**', '*.config.*') }}
+          restore-keys: nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm build
 
   create-app:
@@ -53,7 +66,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: pnpm
       # Create an app from this commit, exactly as `pnpm create vichudo-app`
       # would from GitHub, then hold it to the same bar as the template.
