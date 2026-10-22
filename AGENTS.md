@@ -94,6 +94,9 @@ oxlint and oxfmt. Package manager: pnpm 12.
   the `.nvmrc` version. Raise all three together.
 - `prisma`, `@prisma/client` and `@prisma/adapter-pg` share one version.
   Check `@prisma/client`'s `latest` before bumping: `prisma`'s can point at a
-  prerelease with no matching client.
+  prerelease with no matching client. Prisma 8 is not a bump but a new ORM
+  (`@prisma/orm-postgres`, contracts instead of `prisma generate`, a new
+  query API; see Prisma's 7-to-8 upgrade guide), and Better Auth's Prisma
+  adapter supports Prisma 5 to 7 only.
 - oxlint runs type-aware rules through `oxlint-tsgolint`. Fix findings rather
   than disabling them; a disable needs a reason and an exact rule name.
