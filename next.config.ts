@@ -14,6 +14,9 @@ const config: NextConfig = {
   typedRoutes: true,
   // No `X-Powered-By: Next.js` header: it tells scanners what to probe for.
   poweredByHeader: false,
+  // Loaded by Node.js rather than bundled, as Next.js does for Prisma 7's
+  // client: one copy for pages and route handlers, which share one client.
+  serverExternalPackages: ['@prisma/orm-postgres'],
 };
 
 export default config;

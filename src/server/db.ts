@@ -20,12 +20,33 @@ const createPool = () => {
   return pool;
 };
 
-// One pool per process, shared by Prisma and Better Auth. Next.js loads pages
-// and route handlers as separate module graphs, and development reloads
-// modules: a module-level pool alone would open one for each.
-const globalForDb = globalThis as unknown as { pool: Pool | undefined };
+const createDb = (pool: Pool) =>
+  postgres<Contract>({
+    contractJson,
+    pg: pool,
+    // Prisma reports problems only through `log`, silently by default: say, a
+    // database whose schema does not match the contract (a migration not run).
+    log: console,
+  });
+
+// One pool and one client per process, shared by Prisma and Better Auth.
+// Next.js loads pages and route handlers as separate module graphs, and
+// development reloads modules: module-level instances alone would make one
+// for each. Two clients on one pool would also clash, since each names its
+// prepared statements `pn_1`, `pn_2`… on the same connections.
+const globalForDb = globalThis as unknown as {
+  pool: Pool | undefined;
+  db: { storageHash: string; client: ReturnType<typeof createDb> } | undefined;
+};
 
 export const pool = (globalForDb.pool ??= createPool());
+
+// A new client when the contract changes, so `pnpm db:push` reaches a running
+// `pnpm dev`.
+const { storageHash } = contractJson.storage;
+if (globalForDb.db?.storageHash !== storageHash) {
+  globalForDb.db = { storageHash, client: createDb(pool) };
+}
 
 /**
  * The Prisma ORM client, typed by `prisma/contract.prisma`: query models
@@ -33,10 +54,4 @@ export const pool = (globalForDb.pool ??= createPool());
  *
  * @see https://www.prisma.io/docs/orm/reference/orm-client
  */
-export const db = postgres<Contract>({
-  contractJson,
-  pg: pool,
-  // Prisma reports problems only through `log`, silently by default: say, a
-  // database whose schema does not match the contract (a migration not run).
-  log: console,
-});
+export const db = globalForDb.db.client;
