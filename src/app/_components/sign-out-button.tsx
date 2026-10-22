@@ -6,6 +6,7 @@ import { useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { toast } from '@/components/ui/toast';
 import { authClient } from '@/lib/auth-client';
 
 export function SignOutButton() {
@@ -20,7 +21,15 @@ export function SignOutButton() {
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
-          await authClient.signOut();
+          const { error } = await authClient.signOut();
+          if (error) {
+            toast.add({
+              type: 'error',
+              title: 'Could not sign out',
+              description: error.message || 'Try again.',
+            });
+            return;
+          }
           // The browser keeps one query cache; clear it so the next visitor on
           // this device never sees the previous user's data.
           queryClient.clear();
