@@ -29,7 +29,21 @@ export function LatestPost() {
       onSuccess: async (post) => {
         await queryClient.invalidateQueries(trpc.post.pathFilter());
         setName('');
-        toast.add({ title: 'Post created', description: post.name });
+        toast.add({
+          type: 'success',
+          title: 'Post created',
+          description: post.name,
+        });
+      },
+      // Validation errors show under the field. Anything else (signed out,
+      // offline, a server failure) would otherwise go unnoticed.
+      onError: (error) => {
+        if (error.data?.zodError) return;
+        toast.add({
+          type: 'error',
+          title: 'Could not create the post',
+          description: error.message,
+        });
       },
     }),
   );

@@ -53,6 +53,13 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
 
     return {
       ...shape,
+      // An unexpected error (a failed query, a bug) carries its cause's
+      // message, which can expose internals. In production the client gets a
+      // generic one; the route handler logs the original.
+      message:
+        error.code === 'INTERNAL_SERVER_ERROR' && env.NODE_ENV === 'production'
+          ? 'Something went wrong. Try again.'
+          : shape.message,
       data: { ...shape.data, zodError },
     };
   },
@@ -105,7 +112,10 @@ export const protectedProcedure = t.procedure
   .use(timingMiddleware)
   .use(({ ctx, next }) => {
     if (!ctx.session?.user) {
-      throw new TRPCError({ code: 'UNAUTHORIZED' });
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'Sign in to continue.',
+      });
     }
     return next({
       ctx: {

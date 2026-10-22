@@ -18,6 +18,8 @@ import { authClient } from '@/lib/auth-client';
 
 type Mode = 'sign-in' | 'sign-up';
 
+const FALLBACK_ERROR = 'Something went wrong. Try again.';
+
 /** Reads a text field from a submitted form; file inputs are not expected. */
 function textField(form: FormData, name: string) {
   const value = form.get(name);
@@ -54,7 +56,7 @@ export function AuthForm({
           : await authClient.signIn.email({ email, password });
 
       if (result.error) {
-        setError(result.error.message ?? 'Something went wrong. Try again.');
+        setError(result.error.message || FALLBACK_ERROR);
         return;
       }
       // Drop anything cached for the previous visitor. The navigation renders
@@ -106,7 +108,7 @@ export function AuthForm({
             <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
               or
             </FieldSeparator>
-            <GoogleButton disabled={pending} />
+            <GoogleButton disabled={pending} onError={setError} />
           </>
         )}
       </FieldGroup>
@@ -114,7 +116,13 @@ export function AuthForm({
   );
 }
 
-function GoogleButton({ disabled }: { disabled: boolean }) {
+function GoogleButton({
+  disabled,
+  onError,
+}: {
+  disabled: boolean;
+  onError: (message: string) => void;
+}) {
   const [pending, startTransition] = useTransition();
 
   return (
@@ -124,11 +132,13 @@ function GoogleButton({ disabled }: { disabled: boolean }) {
       disabled={disabled || pending}
       onClick={() =>
         startTransition(async () => {
-          // Redirects to Google, then back to `callbackURL`.
-          await authClient.signIn.social({
+          // Redirects to Google, then back to `callbackURL`. It only returns
+          // when the redirect could not start.
+          const { error } = await authClient.signIn.social({
             provider: 'google',
             callbackURL: '/',
           });
+          if (error) onError(error.message || FALLBACK_ERROR);
         })
       }
     >
