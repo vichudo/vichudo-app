@@ -1,12 +1,11 @@
 import { betterAuth } from 'better-auth';
-import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { nextCookies } from 'better-auth/next-js';
 import { io } from 'next/cache';
 import { headers } from 'next/headers';
 import { cache } from 'react';
 
 import { env } from '@/env';
-import { db } from '@/server/db';
+import { pool } from '@/server/db';
 
 /** Google sign-in is configured, but only turns on once both keys are set. */
 const google =
@@ -24,7 +23,17 @@ const google =
 export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BETTER_AUTH_URL,
-  database: prismaAdapter(db, { provider: 'postgresql' }),
+  // The app's Postgres pool, through Better Auth's built-in Kysely adapter.
+  // Prisma owns these tables (`prisma/contract.prisma`) and their migrations;
+  // Better Auth only reads and writes rows.
+  database: pool,
+  advanced: {
+    // While developing, check the auth tables against these options before
+    // the first request: a plugin added without its migration fails loudly.
+    // Elsewhere, skip the extra round trip on every cold start, and the
+    // connection attempt when `next build` loads this module.
+    database: { validateSchema: env.NODE_ENV === 'development' },
+  },
   emailAndPassword: {
     enabled: true,
     // Password reset needs an email sender, e.g. Resend:

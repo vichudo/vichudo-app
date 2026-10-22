@@ -28,20 +28,23 @@ const session: NonNullable<Context['session']> = {
 
 /** A caller over a stubbed database: procedures run without Postgres. */
 function setup({ signedIn }: { signedIn: boolean }) {
-  const db = {
-    post: {
-      create: vi.fn<
-        (args: { data: { name: string } }) => Promise<{ name: string }>
-      >(({ data }) => Promise.resolve({ name: data.name })),
-      findFirst: vi.fn<() => Promise<null>>(() => Promise.resolve(null)),
-    },
+  const first = vi.fn<() => Promise<null>>(() => Promise.resolve(null));
+  const Post = {
+    create: vi.fn<
+      (row: { name: string; createdById: string }) => Promise<{ name: string }>
+    >((row) => Promise.resolve({ name: row.name })),
+    where: vi.fn<
+      (filter: { createdById: string }) => {
+        orderBy: () => { first: typeof first };
+      }
+    >(() => ({ orderBy: () => ({ first }) })),
   };
   const caller = createCaller({
-    db: db as unknown as Context['db'],
+    db: { orm: { public: { Post } } } as unknown as Context['db'],
     session: signedIn ? session : null,
     headers: new Headers(),
   });
-  return { caller, db };
+  return { caller, Post, first };
 }
 
 describe('post router', () => {
@@ -54,33 +57,40 @@ describe('post router', () => {
   });
 
   it('rejects protected procedures without a session', async () => {
-    const { caller, db } = setup({ signedIn: false });
+    const { caller, first } = setup({ signedIn: false });
 
     await expect(caller.post.getLatest()).rejects.toMatchObject({
       code: 'UNAUTHORIZED',
     });
-    expect(db.post.findFirst).not.toHaveBeenCalled();
+    expect(first).not.toHaveBeenCalled();
   });
 
   it('validates input before touching the database', async () => {
-    const { caller, db } = setup({ signedIn: true });
+    const { caller, Post } = setup({ signedIn: true });
 
     await expect(caller.post.create({ name: '   ' })).rejects.toBeInstanceOf(
       TRPCError,
     );
-    expect(db.post.create).not.toHaveBeenCalled();
+    expect(Post.create).not.toHaveBeenCalled();
   });
 
   it('creates a post owned by the signed-in user', async () => {
-    const { caller, db } = setup({ signedIn: true });
+    const { caller, Post } = setup({ signedIn: true });
 
     await caller.post.create({ name: '  First post ' });
 
-    expect(db.post.create).toHaveBeenCalledWith({
-      data: {
-        name: 'First post',
-        createdBy: { connect: { id: 'user_1' } },
-      },
+    expect(Post.create).toHaveBeenCalledWith({
+      name: 'First post',
+      createdById: 'user_1',
     });
+  });
+
+  it("reads only the signed-in user's posts", async () => {
+    const { caller, Post, first } = setup({ signedIn: true });
+
+    await expect(caller.post.getLatest()).resolves.toBeNull();
+
+    expect(Post.where).toHaveBeenCalledWith({ createdById: 'user_1' });
+    expect(first).toHaveBeenCalledOnce();
   });
 });

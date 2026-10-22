@@ -1,0 +1,96 @@
+// use prisma-8
+// The data contract: https://www.prisma.io/docs/orm/contract-authoring/psl-syntax
+// After editing, run `pnpm db:push`, or `pnpm db:plan` then `pnpm db:migrate`
+// (README → Change the database). The connection URL lives in
+// `prisma.config.ts`; the client is created in `src/server/db.ts`.
+//
+// Every timestamp is `TimestamptzJsDate` (or `temporal.createdAtJsDate()` /
+// `temporal.updatedAtJsDate()`), read and written as a JavaScript `Date`.
+// `DateTime`, `Timestamptz`, `Date`, `Time` and `temporal.createdAt()` /
+// `updatedAt()` use `Temporal`, which Node.js 24 lacks: they pass emit, the
+// type check and the build, then throw RUNTIME.TEMPORAL_UNAVAILABLE on the
+// first query. superjson and Better Auth expect a `Date` too.
+model Post {
+  id          Int                        @id @default(autoincrement())
+  name        String
+  // Both set by Prisma from the application's clock.
+  createdAt   temporal.createdAtJsDate()
+  updatedAt   temporal.updatedAtJsDate()
+
+  // A user's posts go with them, like their sessions and accounts. The index
+  // below also backs this foreign key.
+  createdBy   User                       @relation(fields: [createdById], references: [id], onDelete: Cascade, index: "post_createdById_createdAt_idx")
+  createdById String
+
+  // Serves `post.getLatest`: one user's posts, newest first.
+  @@index([createdById, createdAt], name: "post_createdById_createdAt_idx")
+  @@map("post")
+}
+
+// Better Auth models. Better Auth reads and writes them itself and sets every
+// timestamp. They mirror `auth.generated.prisma`, which `pnpm auth:generate`
+// updates with the fields Better Auth's plugins need (see README → Add more
+// auth features). https://www.better-auth.com/docs/concepts/database
+model User {
+  id            String            @id
+  posts         Post[]
+  name          String
+  email         String
+  emailVerified Boolean           @default(false)
+  image         String?
+  createdAt     TimestamptzJsDate @default(now())
+  updatedAt     TimestamptzJsDate @default(now())
+  sessions      Session[]
+  accounts      Account[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String            @id
+  expiresAt TimestamptzJsDate
+  token     String
+  createdAt TimestamptzJsDate @default(now())
+  updatedAt TimestamptzJsDate @default(now())
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String             @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  TimestamptzJsDate?
+  refreshTokenExpiresAt TimestamptzJsDate?
+  scope                 String?
+  password              String?
+  createdAt             TimestamptzJsDate  @default(now())
+  updatedAt             TimestamptzJsDate  @default(now())
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String            @id
+  identifier String
+  value      String
+  expiresAt  TimestamptzJsDate
+  createdAt  TimestamptzJsDate @default(now())
+  updatedAt  TimestamptzJsDate @default(now())
+
+  @@index([identifier])
+  @@map("verification")
+}

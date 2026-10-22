@@ -9,7 +9,7 @@ pnpm create vichudo-app@latest my-app
 npm create vichudo-app@latest my-app
 ```
 
-You get Next.js 16, tRPC 11, Prisma 7, Better Auth (email and password, Google
+You get Next.js 16, tRPC 11, Prisma 8, Better Auth (email and password, Google
 ready), Tailwind CSS 4, shadcn/ui, TypeScript 7, oxlint and oxfmt. The command:
 
 1. copies the latest template into `my-app`,
@@ -29,7 +29,7 @@ pnpm db:dev                # local Postgres, leave it running
 pnpm db:push && pnpm dev   # in a second terminal
 ```
 
-Requires Node.js 24+ and git. pnpm is used through Corepack if it is not
+Requires Node.js 24.11+ and git. pnpm is used through Corepack if it is not
 installed.
 
 ## Options
