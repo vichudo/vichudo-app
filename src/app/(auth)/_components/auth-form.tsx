@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
+import { Suspense, use, useState, useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +19,8 @@ import { authClient } from '@/lib/auth-client';
 type Mode = 'sign-in' | 'sign-up';
 
 const FALLBACK_ERROR = 'Something went wrong. Try again.';
+// The request never completed: offline, or the server went away.
+const NETWORK_ERROR = 'Could not reach the server. Check your connection.';
 
 /** Reads a text field from a submitted form; file inputs are not expected. */
 function textField(form: FormData, name: string) {
@@ -31,7 +33,8 @@ export function AuthForm({
   googleEnabled,
 }: {
   mode: Mode;
-  googleEnabled: boolean;
+  /** Resolved on the server at request time (see `isGoogleEnabled`). */
+  googleEnabled: Promise<boolean>;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -40,25 +43,34 @@ export function AuthForm({
 
   function onSubmit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const email = textField(form, 'email');
     const password = textField(form, 'password');
 
     setError(null);
     startTransition(async () => {
-      const result =
-        mode === 'sign-up'
-          ? await authClient.signUp.email({
-              name: textField(form, 'name'),
-              email,
-              password,
-            })
-          : await authClient.signIn.email({ email, password });
+      try {
+        const result =
+          mode === 'sign-up'
+            ? await authClient.signUp.email({
+                name: textField(form, 'name'),
+                email,
+                password,
+              })
+            : await authClient.signIn.email({ email, password });
 
-      if (result.error) {
-        setError(result.error.message || FALLBACK_ERROR);
+        if (result.error) {
+          setError(result.error.message || FALLBACK_ERROR);
+          return;
+        }
+      } catch {
+        setError(NETWORK_ERROR);
         return;
       }
+      // Next keeps this page mounted, hidden, after navigating away: clear
+      // the credentials so they never reappear, for this user or the next.
+      formElement.reset();
       // Drop anything cached for the previous visitor. The navigation renders
       // the home page's dynamic parts fresh, with the new session cookie.
       queryClient.clear();
@@ -103,16 +115,37 @@ export function AuthForm({
           {pending && <Spinner data-icon="inline-start" />}
           {mode === 'sign-up' ? 'Create account' : 'Sign in'}
         </Button>
-        {googleEnabled && (
-          <>
-            <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
-              or
-            </FieldSeparator>
-            <GoogleButton disabled={pending} onError={setError} />
-          </>
-        )}
+        {/* Only this part waits for the request; the form is static. */}
+        <Suspense fallback={null}>
+          <GoogleSignIn
+            enabled={googleEnabled}
+            disabled={pending}
+            onError={setError}
+          />
+        </Suspense>
       </FieldGroup>
     </form>
+  );
+}
+
+function GoogleSignIn({
+  enabled,
+  disabled,
+  onError,
+}: {
+  enabled: Promise<boolean>;
+  disabled: boolean;
+  onError: (message: string) => void;
+}) {
+  if (!use(enabled)) return null;
+
+  return (
+    <>
+      <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
+        or
+      </FieldSeparator>
+      <GoogleButton disabled={disabled} onError={onError} />
+    </>
   );
 }
 
@@ -134,11 +167,15 @@ function GoogleButton({
         startTransition(async () => {
           // Redirects to Google, then back to `callbackURL`. It only returns
           // when the redirect could not start.
-          const { error } = await authClient.signIn.social({
-            provider: 'google',
-            callbackURL: '/',
-          });
-          if (error) onError(error.message || FALLBACK_ERROR);
+          try {
+            const { error } = await authClient.signIn.social({
+              provider: 'google',
+              callbackURL: '/',
+            });
+            if (error) onError(error.message || FALLBACK_ERROR);
+          } catch {
+            onError(NETWORK_ERROR);
+          }
         })
       }
     >

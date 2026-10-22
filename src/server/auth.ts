@@ -31,14 +31,27 @@ export const auth = betterAuth({
     // sendResetPassword: async ({ user, url }) => { ... },
   },
   socialProviders: google ? { google } : {},
+  // `next dev` moves to the next free port when 3000 is taken: accept any
+  // local port while developing, so sign-in is not refused as cross-origin.
+  trustedOrigins:
+    env.NODE_ENV === 'development'
+      ? ['http://localhost:*', 'http://127.0.0.1:*']
+      : undefined,
   // Must stay last: lets server actions set the session cookie.
   plugins: [nextCookies()],
 });
 
 export type Session = typeof auth.$Infer.Session;
 
-/** Whether the sign-in pages should offer "Continue with Google". */
-export const isGoogleEnabled = google !== undefined;
+/**
+ * Whether the sign-in pages should offer "Continue with Google". Resolved at
+ * request time, so an app built without the keys (Docker, CI) follows the
+ * environment it runs in rather than the one it was built in.
+ */
+export async function isGoogleEnabled() {
+  await io();
+  return google !== undefined;
+}
 
 /**
  * The current session in Server Components, read once per request.
@@ -46,8 +59,15 @@ export const isGoogleEnabled = google !== undefined;
  * Cache Components only allows random values (session tokens, CSRF state) at
  * request time: `io()` keeps the read out of prerenders and resolves
  * immediately during a request.
+ *
+ * A render cannot set cookies, so it does not extend the session either:
+ * that would push back the database expiry while the cookie keeps its old
+ * one. Route handlers (tRPC, `/api/auth`) refresh both.
  */
 export const getSession = cache(async () => {
   await io();
-  return auth.api.getSession({ headers: await headers() });
+  return auth.api.getSession({
+    headers: await headers(),
+    query: { disableRefresh: true },
+  });
 });
