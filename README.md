@@ -166,8 +166,13 @@ then run `pnpm db:push` while prototyping. Once there is data to keep, record
 each change as a migration instead: `pnpm db:plan --name add_tags` writes it
 to `prisma/migrations` for review, and `pnpm db:migrate` applies it. From the
 first migration on, stay with `db:plan` and `db:migrate`: a `db:push` change
-has no migration, so the next plan cannot start from it. `db:push` and
-`db:plan` regenerate the contract's types first.
+has no migration, so the next plan cannot start from it. If that happens,
+plan from the newest migration's folder,
+`pnpm db:plan --name add_tags --from <folder>`, then run `pnpm db:migrate`.
+
+Type timestamps as `TimestamptzJsDate`, like the existing models: Prisma 8's
+`DateTime` is a `Temporal.Instant`, and Node.js 24 has no `Temporal`, so such
+a column fails on its first query.
 
 ### Add a UI component
 
@@ -221,7 +226,9 @@ Add the plugin in `src/server/auth.ts` and its client plugin in
 and fields the plugin needs to `prisma/auth.generated.prisma`, in Better
 Auth's own syntax. Copy `git diff prisma/auth.generated.prisma` into
 `prisma/contract.prisma` (the file's header says how to translate it), then
-run `pnpm db:push`. While developing, Better Auth checks its tables before
+apply it as in [Change the database](#change-the-database): `pnpm db:push`,
+or `pnpm db:plan --name <plugin>` and `pnpm db:migrate` once the app has
+migrations. While developing, Better Auth checks its tables before
 the first request and names any that are missing (skip its `auth migrate`
 hint: Prisma manages the tables). Password reset and email
 verification need an email sender; the spot is marked in
@@ -242,8 +249,12 @@ migrations, so before the first deploy record the schema as one with
 `pnpm db:plan --name init`, apply any change it plans beyond your local
 database with `pnpm db:migrate`, and commit `prisma/migrations`. Then apply
 migrations to production with `pnpm db:deploy`, with `DATABASE_URL` set to
-the production database, or run it in the build command:
-`pnpm db:deploy && pnpm build`.
+the production database. To apply them on every production deploy instead,
+set the build command to
+`if [ "$VERCEL_ENV" = production ]; then pnpm db:deploy; fi && pnpm build`:
+Preview builds must not migrate the production database to a branch's
+migrations, which would stop the next production deploy. Give Preview
+deployments a database of their own, such as a Neon branch.
 
 Anywhere else, deploy it as any Next.js app. Server-only variables, Google's
 included, are read when the app runs, so one build can serve any
