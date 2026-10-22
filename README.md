@@ -30,7 +30,7 @@ and `--ref` to pin a template version. The CLI's source is in
 
 ## Quick start
 
-You need [Node.js 24+](https://nodejs.org) (`nvm use` or `fnm use` reads
+You need [Node.js 24.11+](https://nodejs.org) (`nvm use` or `fnm use` reads
 `.nvmrc`) and pnpm (`corepack enable` provides the exact version this
 project pins).
 
@@ -61,8 +61,9 @@ Open http://localhost:3000, create an account, and write a post.
 | `pnpm check`      | Format, lint, typecheck and test: run it before you push       |
 | `pnpm format`     | Formats every file (your editor and the commit hook do it too) |
 | `pnpm lint:fix`   | Applies lint autofixes                                         |
-| `pnpm db:push`    | Syncs the database with `prisma/schema.prisma`, no migration   |
-| `pnpm db:migrate` | Creates and applies a migration, once you have data to keep    |
+| `pnpm db:push`    | Syncs the database with `prisma/contract.prisma`, no migration |
+| `pnpm db:plan`    | Plans a migration from contract changes (`--name add_tags`)    |
+| `pnpm db:migrate` | Applies planned migrations to the local database               |
 | `pnpm db:studio`  | Browses the database in Prisma Studio                          |
 | `pnpm test`       | Runs the tests (`pnpm test:watch` keeps them running)          |
 | `pnpm build`      | Builds for production                                          |
@@ -70,18 +71,18 @@ Open http://localhost:3000, create an account, and write a post.
 <details>
 <summary>All other scripts</summary>
 
-| Command              | What it does                                          |
-| -------------------- | ----------------------------------------------------- |
-| `pnpm start`         | Serves the production build                           |
-| `pnpm preview`       | Builds, then serves                                   |
-| `pnpm typecheck`     | Generates route types, then runs `tsc`                |
-| `pnpm format:check`  | Checks formatting without writing                     |
-| `pnpm lint`          | oxlint, type-aware                                    |
-| `pnpm db:deploy`     | Applies pending migrations (production)               |
-| `pnpm db:generate`   | Regenerates the Prisma client (runs on install)       |
-| `pnpm auth:generate` | Adds the tables Better Auth's config and plugins need |
-| `pnpm auth:secret`   | Prints a new `BETTER_AUTH_SECRET`                     |
-| `pnpm env:init`      | Creates `.env` from `.env.example` if it is missing   |
+| Command              | What it does                                           |
+| -------------------- | ------------------------------------------------------ |
+| `pnpm start`         | Serves the production build                            |
+| `pnpm preview`       | Builds, then serves                                    |
+| `pnpm typecheck`     | Generates route types, then runs `tsc`                 |
+| `pnpm format:check`  | Checks formatting without writing                      |
+| `pnpm lint`          | oxlint, type-aware                                     |
+| `pnpm db:deploy`     | Applies pending migrations (production)                |
+| `pnpm db:generate`   | Regenerates the contract's types (runs on install)     |
+| `pnpm auth:generate` | Lists the tables Better Auth's config and plugins need |
+| `pnpm auth:secret`   | Prints a new `BETTER_AUTH_SECRET`                      |
+| `pnpm env:init`      | Creates `.env` from `.env.example` if it is missing    |
 
 </details>
 
@@ -98,7 +99,7 @@ export const postRouter = createTRPCRouter({
   byId: publicProcedure
     .input(z.object({ id: z.number() }))
     .query(({ ctx, input }) =>
-      ctx.db.post.findUnique({ where: { id: input.id } }),
+      ctx.db.orm.public.Post.where({ id: input.id }).first(),
     ),
 });
 ```
@@ -159,9 +160,14 @@ instantly. For a mutation, see `src/app/_components/latest-post.tsx`.
 
 ### Change the database
 
-Edit `prisma/schema.prisma`, then run `pnpm db:push` while prototyping, or
-`pnpm db:migrate` to record a migration once there is data to keep. Either
-regenerates the Prisma client; restart `pnpm dev` to load it.
+Edit `prisma/contract.prisma`, the
+[data contract](https://www.prisma.io/docs/orm/contract-authoring/psl-syntax),
+then run `pnpm db:push` while prototyping. Once there is data to keep, record
+each change as a migration instead: `pnpm db:plan --name add_tags` writes it
+to `prisma/migrations` for review, and `pnpm db:migrate` applies it. From the
+first migration on, stay with `db:plan` and `db:migrate`: a `db:push` change
+has no migration, so the next plan cannot start from it. `db:push` and
+`db:plan` regenerate the contract's types first.
 
 ### Add a UI component
 
@@ -211,9 +217,15 @@ variable fails the build instead of a request.
 Better Auth adds features as plugins: two-factor, passkeys, magic links,
 organizations, admin ([list](https://www.better-auth.com/docs/plugins/2fa)).
 Add the plugin in `src/server/auth.ts` and its client plugin in
-`src/lib/auth-client.ts`, then run `pnpm auth:generate` and `pnpm db:push`
-for any tables it needs. Password reset and email verification need an email
-sender; the spot is marked in `src/server/auth.ts`.
+`src/lib/auth-client.ts`, then run `pnpm auth:generate`: it adds the tables
+and fields the plugin needs to `prisma/auth.generated.prisma`, in Better
+Auth's own syntax. Copy `git diff prisma/auth.generated.prisma` into
+`prisma/contract.prisma` (the file's header says how to translate it), then
+run `pnpm db:push`. While developing, Better Auth checks its tables before
+the first request and names any that are missing (skip its `auth migrate`
+hint: Prisma manages the tables). Password reset and email
+verification need an email sender; the spot is marked in
+`src/server/auth.ts`.
 
 ### Deploy
 
@@ -227,10 +239,11 @@ database (for example Neon, from the Vercel Marketplace), and set:
 
 The production database needs the tables. `pnpm db:push` records no
 migrations, so before the first deploy record the schema as one with
-`pnpm db:migrate --name init` (it may offer to reset a local database made by
-`db:push`) and commit `prisma/migrations`. Then apply migrations to
-production with `pnpm db:deploy`, with `DATABASE_URL` set to the production
-database, or run it in the build command: `pnpm db:deploy && pnpm build`.
+`pnpm db:plan --name init`, apply any change it plans beyond your local
+database with `pnpm db:migrate`, and commit `prisma/migrations`. Then apply
+migrations to production with `pnpm db:deploy`, with `DATABASE_URL` set to
+the production database, or run it in the build command:
+`pnpm db:deploy && pnpm build`.
 
 Anywhere else, deploy it as any Next.js app. Server-only variables, Google's
 included, are read when the app runs, so one build can serve any
@@ -239,7 +252,7 @@ environment.
 ## Project structure
 
 ```text
-prisma/schema.prisma          Database schema
+prisma/contract.prisma        Data contract: the database's models
 src/
   app/                        Routes: pages, layouts, API endpoints
     (auth)/                   Sign-in and sign-up pages
@@ -270,7 +283,7 @@ file it edits.
 | Framework       | [Next.js 16](https://nextjs.org): App Router, Turbopack, Cache Components, typed routes                 |
 | UI              | React 19.3, [Tailwind CSS 4](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com) on Base UI    |
 | API             | [tRPC 11](https://trpc.io) with TanStack Query and superjson                                            |
-| Database        | [Prisma 7](https://prisma.io) and PostgreSQL; `prisma dev` locally                                      |
+| Database        | [Prisma 8](https://prisma.io) (release candidate) and PostgreSQL; Prisma Postgres locally               |
 | Auth            | [Better Auth](https://www.better-auth.com): email and password, Google ready                            |
 | Validation      | [Zod 4](https://zod.dev); environment variables through [`@t3-oss/env-nextjs`](https://env.t3.gg)       |
 | Language        | [TypeScript 7](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/), strict            |
@@ -293,10 +306,14 @@ file it edits.
   than `../`.
 - **TypeScript 7.** The native compiler type-checks this project in about
   half a second. It has no JavaScript API yet, hence the editor extension.
-- **Prisma 7.** The connection URL lives in `prisma.config.ts`; the client
-  connects through `@prisma/adapter-pg` and is generated into
-  `src/generated/prisma`. `pnpm db:dev` runs
-  [Prisma Postgres locally](https://www.prisma.io/docs/postgres/database/local-development).
+- **Prisma 8.** You edit a data contract (`prisma/contract.prisma`);
+  `prisma contract emit` turns it into types in `src/generated/prisma`, and
+  migrations are planned from its changes. No generated client: queries run
+  on the app's `pg` pool, which Better Auth shares. The connection URL lives
+  in `prisma.config.ts`. `pnpm db:dev` runs
+  [Prisma Postgres locally](https://www.prisma.io/docs/postgres/database/local-development)
+  and `pnpm db:studio` opens Prisma Studio, both through Prisma 7's CLI
+  (`prisma7`) until Prisma 8's has them.
 - **pnpm supply-chain defaults.** New releases install only once they are a
   day old, and only the packages listed in `pnpm-workspace.yaml` may run
   install scripts.
