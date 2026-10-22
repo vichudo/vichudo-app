@@ -9,6 +9,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { createServer } from 'node:net';
@@ -25,6 +26,8 @@ const UI_DIR = 'src/components/ui';
 const MIN_NODE_MAJOR = 24;
 // The template's `pnpm db:dev` ports (server, database, shadow database).
 const TEMPLATE_DB_PORTS = [51213, 51214, 51215];
+// Commands installed as `.cmd` shims on Windows.
+const SHIMS = new Set(['pnpm', 'corepack']);
 
 const HELP = `Usage: pnpm create vichudo-app [directory] [options]
 
@@ -51,6 +54,25 @@ class CliError extends Error {}
 const comment = (text) => styleText('dim', `# ${text}`);
 
 /**
+ * Spawns a command synchronously. On Windows, pnpm and Corepack are `.cmd`
+ * shims, which only run through a shell; nothing else goes through one,
+ * since a shell splits arguments that contain spaces (paths, the commit
+ * message).
+ *
+ * @param {string} command
+ * @param {string[]} args
+ * @param {import('node:child_process').SpawnSyncOptions} options
+ */
+function spawn(command, args, options) {
+  if (process.platform === 'win32' && SHIMS.has(command)) {
+    // Node.js does not escape arguments for a shell: hand it one command
+    // line. Shim arguments here are plain words.
+    return spawnSync([command, ...args].join(' '), { ...options, shell: true });
+  }
+  return spawnSync(command, args, options);
+}
+
+/**
  * Runs a command, inheriting stdio unless `quiet`. Throws on failure.
  *
  * @param {string} command
@@ -58,11 +80,9 @@ const comment = (text) => styleText('dim', `# ${text}`);
  * @param {{ cwd?: string, quiet?: boolean }} [options]
  */
 function run(command, args, { cwd, quiet = false } = {}) {
-  const result = spawnSync(command, args, {
+  const result = spawn(command, args, {
     cwd,
     stdio: quiet ? 'pipe' : 'inherit',
-    // pnpm and git are `.cmd` shims on Windows.
-    shell: process.platform === 'win32',
   });
   if (result.status !== 0) {
     throw new CliError(`\`${[command, ...args].join(' ')}\` failed.`);
@@ -75,12 +95,7 @@ function run(command, args, { cwd, quiet = false } = {}) {
  * @param {string} command
  */
 function hasCommand(command) {
-  return (
-    spawnSync(command, ['--version'], {
-      stdio: 'ignore',
-      shell: process.platform === 'win32',
-    }).status === 0
-  );
+  return spawn(command, ['--version'], { stdio: 'ignore' }).status === 0;
 }
 
 /**
@@ -370,21 +385,41 @@ Open http://localhost:3000 and create an account. Next steps are in README.md.
 `);
 }
 
+/** The command-line options; a mistyped one is a usage error, not a crash. */
+function parseOptions() {
+  try {
+    return parseArgs({
+      allowPositionals: true,
+      allowNegative: true,
+      options: {
+        ref: { type: 'string' },
+        template: { type: 'string', default: TEMPLATE },
+        components: { type: 'string' },
+        install: { type: 'boolean', default: true },
+        git: { type: 'boolean', default: true },
+        yes: { type: 'boolean', short: 'y', default: false },
+        help: { type: 'boolean', short: 'h', default: false },
+        version: { type: 'boolean', short: 'v', default: false },
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new CliError(`${message}\nRun with --help to see the options.`, {
+      cause: error,
+    });
+  }
+}
+
 async function main() {
-  const { values, positionals } = parseArgs({
-    allowPositionals: true,
-    allowNegative: true,
-    options: {
-      ref: { type: 'string' },
-      template: { type: 'string', default: TEMPLATE },
-      components: { type: 'string' },
-      install: { type: 'boolean', default: true },
-      git: { type: 'boolean', default: true },
-      yes: { type: 'boolean', short: 'y', default: false },
-      help: { type: 'boolean', short: 'h', default: false },
-      version: { type: 'boolean', short: 'v', default: false },
-    },
-  });
+  // First: older Node.js versions fail on the option parser below.
+  const nodeMajor = Number(process.versions.node.split('.')[0]);
+  if (nodeMajor < MIN_NODE_MAJOR) {
+    throw new CliError(
+      `Node.js ${MIN_NODE_MAJOR} or newer is required; this is ${process.versions.node}.`,
+    );
+  }
+
+  const { values, positionals } = parseOptions();
 
   if (values.help) {
     console.info(HELP);
@@ -398,12 +433,6 @@ async function main() {
     return;
   }
 
-  const nodeMajor = Number(process.versions.node.split('.')[0]);
-  if (nodeMajor < MIN_NODE_MAJOR) {
-    throw new CliError(
-      `Node.js ${MIN_NODE_MAJOR} or newer is required; this is ${process.versions.node}.`,
-    );
-  }
   if (!hasCommand('git')) {
     throw new CliError('git is required to download the template.');
   }
@@ -416,8 +445,13 @@ async function main() {
   if (!name) {
     throw new CliError(`"${directory}" does not give a valid package name.`);
   }
-  if (existsSync(root) && readdirSync(root).length > 0) {
-    throw new CliError(`${directory} already exists and is not empty.`);
+  if (
+    existsSync(root) &&
+    (!statSync(root).isDirectory() || readdirSync(root).length > 0)
+  ) {
+    throw new CliError(
+      `${directory} already exists and is not an empty directory.`,
+    );
   }
   const components = await chooseComponents(values.components, interactive);
 
