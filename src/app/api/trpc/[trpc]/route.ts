@@ -14,14 +14,16 @@ const handler = (req: Request) =>
     req,
     router: appRouter,
     createContext: () => createTRPCContext({ headers: req.headers }),
-    onError:
-      env.NODE_ENV === 'development'
-        ? ({ path, error }) => {
-            console.error(
-              `tRPC failed on ${path ?? '<no-path>'}: ${error.message}`,
-            );
-          }
-        : undefined,
+    // Unexpected failures always reach the logs, with their stack and cause.
+    // Expected ones (invalid input, signed out) only while developing.
+    onError({ path, error }) {
+      const where = `tRPC failed on ${path ?? '<no-path>'}`;
+      if (error.code === 'INTERNAL_SERVER_ERROR') {
+        console.error(`${where}:`, error);
+      } else if (env.NODE_ENV === 'development') {
+        console.error(`${where}: ${error.message}`);
+      }
+    },
   });
 
 export { handler as GET, handler as POST };

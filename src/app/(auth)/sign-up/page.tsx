@@ -22,7 +22,7 @@ export default function SignUpPage() {
         <CardDescription>Passwords need at least 8 characters.</CardDescription>
       </CardHeader>
       <CardContent>
-        <AuthForm mode="sign-up" googleEnabled={isGoogleEnabled} />
+        <AuthForm mode="sign-up" googleEnabled={isGoogleEnabled()} />
       </CardContent>
       <CardFooter className="justify-center text-sm text-muted-foreground">
         <p>

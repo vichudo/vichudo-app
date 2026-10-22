@@ -10,7 +10,7 @@ import superjson from 'superjson';
 import { z, ZodError } from 'zod';
 
 import { env } from '@/env';
-import { auth } from '@/server/auth';
+import { auth, type Session } from '@/server/auth';
 import { db } from '@/server/db';
 
 /**
@@ -21,13 +21,20 @@ import { db } from '@/server/db';
  *
  * @see https://trpc.io/docs/server/context
  */
-export const createTRPCContext = async (opts: { headers: Headers }) => {
-  const session = await auth.api.getSession({ headers: opts.headers });
+export const createTRPCContext = async (opts: {
+  headers: Headers;
+  /** The request's session, when the caller has read it already. */
+  session?: Session | null;
+}) => {
+  const session =
+    opts.session === undefined
+      ? await auth.api.getSession({ headers: opts.headers })
+      : opts.session;
 
   return {
     db,
     session,
-    ...opts,
+    headers: opts.headers,
   };
 };
 
@@ -40,12 +47,24 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
   errorFormatter({ shape, error }) {
-    // Keyed by input field, so the client can read `fieldErrors.name`.
+    // Keyed by input field, so the client can read `fieldErrors.name`. Only
+    // for invalid input: a Zod error inside a procedure (`.output()`, parsing
+    // a response) is a bug, and its schema is nobody's business.
     const zodError: z.core.$ZodFlattenedError<Record<string, unknown>> | null =
-      error.cause instanceof ZodError ? z.flattenError(error.cause) : null;
+      error.code === 'BAD_REQUEST' && error.cause instanceof ZodError
+        ? z.flattenError(error.cause)
+        : null;
 
     return {
       ...shape,
+      // Every INTERNAL_SERVER_ERROR (any error that is not a TRPCError, or
+      // one thrown with that code) can carry internals in its message. In
+      // production the client gets a generic one; the route handler logs the
+      // original.
+      message:
+        error.code === 'INTERNAL_SERVER_ERROR' && env.NODE_ENV === 'production'
+          ? 'Something went wrong. Try again.'
+          : shape.message,
       data: { ...shape.data, zodError },
     };
   },
@@ -98,7 +117,10 @@ export const protectedProcedure = t.procedure
   .use(timingMiddleware)
   .use(({ ctx, next }) => {
     if (!ctx.session?.user) {
-      throw new TRPCError({ code: 'UNAUTHORIZED' });
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'Sign in to continue.',
+      });
     }
     return next({
       ctx: {

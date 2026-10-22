@@ -1,16 +1,13 @@
 'use client';
 
-import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { toast } from '@/components/ui/toast';
 import { authClient } from '@/lib/auth-client';
 
 export function SignOutButton() {
-  const router = useRouter();
-  const queryClient = useQueryClient();
   const [pending, startTransition] = useTransition();
 
   return (
@@ -20,11 +17,25 @@ export function SignOutButton() {
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
-          await authClient.signOut();
-          // The browser keeps one query cache; clear it so the next visitor on
-          // this device never sees the previous user's data.
-          queryClient.clear();
-          router.refresh();
+          let failure: string | undefined;
+          try {
+            const { error } = await authClient.signOut();
+            if (error) failure = error.message || 'Try again.';
+          } catch {
+            failure = 'Could not reach the server. Check your connection.';
+          }
+          if (failure !== undefined) {
+            toast.add({
+              type: 'error',
+              title: 'Could not sign out',
+              description: failure,
+            });
+            return;
+          }
+          // A full page load, not a client navigation: it drops the query
+          // cache and the routes Next keeps mounted in the background, so the
+          // next visitor on this device never sees this user's data or forms.
+          window.location.assign('/');
         })
       }
     >

@@ -24,7 +24,7 @@ export default function SignInPage() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <AuthForm mode="sign-in" googleEnabled={isGoogleEnabled} />
+        <AuthForm mode="sign-in" googleEnabled={isGoogleEnabled()} />
       </CardContent>
       <CardFooter className="justify-center text-sm text-muted-foreground">
         <p>

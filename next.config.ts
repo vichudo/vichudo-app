@@ -12,6 +12,8 @@ const config: NextConfig = {
   partialPrefetching: true,
   // Type-check `<Link href>`, `router.push` and `redirect` against the routes.
   typedRoutes: true,
+  // No `X-Powered-By: Next.js` header: it tells scanners what to probe for.
+  poweredByHeader: false,
 };
 
 export default config;

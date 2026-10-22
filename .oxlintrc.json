@@ -73,9 +73,11 @@
       }
     ],
     "typescript/prefer-ts-expect-error": "error",
+    // Autofix to a top-level `import type`: the inline form is the one
+    // `no-import-type-side-effects` below rejects.
     "typescript/consistent-type-imports": [
       "error",
-      { "prefer": "type-imports", "fixStyle": "inline-type-imports" }
+      { "prefer": "type-imports", "fixStyle": "separate-type-imports" }
     ],
     // `import { type X }` alone survives `verbatimModuleSyntax` as a
     // side-effect import, which pulls a server module graph into the client

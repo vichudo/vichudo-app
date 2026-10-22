@@ -16,7 +16,7 @@ export const env = createEnv({
    * missing or malformed value fails the build instead of a request.
    */
   server: {
-    // Signs sessions and tokens. Generate one with `pnpm exec auth secret`.
+    // Signs sessions and tokens. Generate one with `pnpm auth:secret`.
     BETTER_AUTH_SECRET: requiredInProduction(z.string().min(32)),
     // The app's public URL. Inferred from the request when unset.
     BETTER_AUTH_URL: z.url().optional(),
@@ -55,9 +55,28 @@ export const env = createEnv({
   },
 
   /**
-   * Set `SKIP_ENV_VALIDATION` to build without real values (Docker, CI).
+   * Cross-variable rules. Google sign-in needs both of its keys: either one
+   * alone would quietly leave it off.
    */
-  skipValidation: Boolean(process.env.SKIP_ENV_VALIDATION),
+  createFinalSchema: (shape) =>
+    z
+      .object(shape)
+      .refine(
+        (vars) =>
+          (vars.GOOGLE_CLIENT_ID === undefined) ===
+          (vars.GOOGLE_CLIENT_SECRET === undefined),
+        {
+          message:
+            'Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or neither.',
+          path: ['GOOGLE_CLIENT_SECRET'],
+        },
+      ),
+
+  /**
+   * Set `SKIP_ENV_VALIDATION=1` to build without real values (Docker, CI).
+   * `0` or `false` keep validation on.
+   */
+  skipValidation: ['1', 'true'].includes(process.env.SKIP_ENV_VALIDATION ?? ''),
 
   /**
    * Treat `FOO=''` as unset, so an empty value fails a required variable.

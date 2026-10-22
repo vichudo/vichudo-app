@@ -3,6 +3,7 @@ import {
   dehydrate,
   HydrationBoundary,
   noop,
+  type InfiniteQueryExecuteOptions,
   type QueryExecuteOptions,
   type QueryKey,
 } from '@tanstack/react-query';
@@ -13,6 +14,7 @@ import { cache } from 'react';
 
 import { appRouter, createCaller } from '@/server/api/root';
 import { createTRPCContext } from '@/server/api/trpc';
+import { getSession } from '@/server/auth';
 import { makeQueryClient } from '@/trpc/query-client';
 
 /**
@@ -20,12 +22,13 @@ import { makeQueryClient } from '@/trpc/query-client';
  * request.
  */
 const createContext = cache(async () => {
-  // Reading the session needs request-time values (see `getSession`).
-  await io();
+  // `getSession` is cached per request: a render that reads the session and
+  // calls tRPC looks it up once.
+  const session = await getSession();
   const heads = new Headers(await headers());
   heads.set('x-trpc-source', 'rsc');
 
-  return createTRPCContext({ headers: heads });
+  return createTRPCContext({ headers: heads, session });
 });
 
 /** One query client per request, shared by every prefetch in the render. */
@@ -47,8 +50,17 @@ export const trpc = createTRPCOptionsProxy({
  */
 export const caller = createCaller(createContext);
 
-/** Sends this request's prefetched queries to the client components below. */
-export function HydrateClient({ children }: { children: React.ReactNode }) {
+/**
+ * Sends this request's prefetched queries to the client components below.
+ * Render it inside `<Suspense>`: `dehydrate` stamps each query with the
+ * current time, which Cache Components allows only at request time (`io()`).
+ */
+export async function HydrateClient({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  await io();
   return (
     <HydrationBoundary state={dehydrate(getQueryClient())}>
       {children}
@@ -80,4 +92,33 @@ export function prefetch<
   // A failure is not lost: it is dehydrated with the query and rethrown by
   // the client component that reads it, into the nearest error boundary.
   void getQueryClient().query(queryOptions).catch(noop);
+}
+
+/**
+ * `prefetch` for paginated data, read with `useSuspenseInfiniteQuery`.
+ *
+ * @example
+ * prefetchInfinite(
+ *   trpc.post.list.infiniteQueryOptions(
+ *     { limit: 10 },
+ *     { getNextPageParam: (page) => page.nextCursor },
+ *   ),
+ * );
+ */
+export function prefetchInfinite<
+  TQueryFnData,
+  TError,
+  TData,
+  TQueryKey extends QueryKey,
+  TPageParam,
+>(
+  queryOptions: InfiniteQueryExecuteOptions<
+    TQueryFnData,
+    TError,
+    TData,
+    TQueryKey,
+    TPageParam
+  >,
+) {
+  void getQueryClient().infiniteQuery(queryOptions).catch(noop);
 }

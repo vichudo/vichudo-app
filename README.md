@@ -30,8 +30,9 @@ and `--ref` to pin a template version. The CLI's source is in
 
 ## Quick start
 
-You need [Node.js 24+](https://nodejs.org) and pnpm (`corepack enable`
-provides the exact version this project pins).
+You need [Node.js 24+](https://nodejs.org) (`nvm use` or `fnm use` reads
+`.nvmrc`) and pnpm (`corepack enable` provides the exact version this
+project pins).
 
 ```bash
 pnpm install
@@ -160,7 +161,7 @@ instantly. For a mutation, see `src/app/_components/latest-post.tsx`.
 
 Edit `prisma/schema.prisma`, then run `pnpm db:push` while prototyping, or
 `pnpm db:migrate` to record a migration once there is data to keep. Either
-regenerates the Prisma client.
+regenerates the Prisma client; restart `pnpm dev` to load it.
 
 ### Add a UI component
 
@@ -224,8 +225,16 @@ database (for example Neon, from the Vercel Marketplace), and set:
   too).
 - `BETTER_AUTH_URL`: the production URL.
 
-Then apply your migrations with `pnpm db:deploy`. Anywhere else, deploy it as
-any Next.js app.
+The production database needs the tables. `pnpm db:push` records no
+migrations, so before the first deploy record the schema as one with
+`pnpm db:migrate --name init` (it may offer to reset a local database made by
+`db:push`) and commit `prisma/migrations`. Then apply migrations to
+production with `pnpm db:deploy`, with `DATABASE_URL` set to the production
+database, or run it in the build command: `pnpm db:deploy && pnpm build`.
+
+Anywhere else, deploy it as any Next.js app. Server-only variables, Google's
+included, are read when the app runs, so one build can serve any
+environment.
 
 ## Project structure
 
