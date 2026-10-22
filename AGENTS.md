@@ -24,7 +24,8 @@ oxlint and oxfmt. Package manager: pnpm 12.
 - `pnpm lint:fix` / `pnpm format` — apply autofixes and formatting.
 - `pnpm test` — Vitest. Tests live next to the code as `*.test.ts`.
 - `pnpm db:push` (prototype) or `pnpm db:migrate` (migration) after editing
-  `prisma/schema.prisma`; both regenerate the client.
+  `prisma/schema.prisma`; both regenerate the client. Restart `pnpm dev` to
+  load it: the running server keeps the client it started with.
 - `pnpm auth:generate` after adding a Better Auth plugin or user field: it
   writes the tables auth needs into `prisma/schema.prisma`. Do not hand-edit
   the `user`, `session`, `account` and `verification` models.
@@ -53,9 +54,11 @@ oxlint and oxfmt. Package manager: pnpm 12.
 - Components under `src/components` reach the server through tRPC or server
   actions, never by importing `@/server/*` (lint-enforced).
 - Import across directories through `@/`, never `../` (lint-enforced).
-- Data for a Client Component: `prefetch(trpc.x.y.queryOptions())` in the
-  Server Component, wrap the tree in `<HydrateClient>`, read it with
-  `useSuspenseQuery(trpc.x.y.queryOptions())` under a `<Suspense>`.
+- Data for a Client Component: inside a `<Suspense>` in the Server
+  Component, `prefetch(trpc.x.y.queryOptions())` and wrap the tree in
+  `<HydrateClient>`; read it with `useSuspenseQuery(trpc.x.y.queryOptions())`
+  under a `<Suspense>`. Paginated data: `prefetchInfinite` with
+  `infiniteQueryOptions`, read with `useSuspenseInfiniteQuery`.
 - Invalidate with `queryClient.invalidateQueries(trpc.x.pathFilter())`. The
   classic `api.useUtils()` API from `@trpc/react-query` does not exist here.
 - Cache Components is on: code that reads cookies, headers or the session
@@ -65,13 +68,18 @@ oxlint and oxfmt. Package manager: pnpm 12.
 - Type-only imports are a top-level `import type`. `import { type X }` on its
   own survives as a side-effect import and can pull server code into the
   client bundle (lint-enforced).
-- Sign-in, sign-up and sign-out go through `authClient`; after any of them,
-  clear the query cache (`queryClient.clear()`) so one user's data never
-  shows for the next.
+- Sign-in, sign-up and sign-out go through `authClient`, so one user's data
+  never shows for the next: after signing in or up, clear the query cache
+  (`queryClient.clear()`) and reset the form; signing out reloads the page
+  (`window.location`), since Next keeps visited pages mounted in the
+  background and only a reload drops them.
 - Throw `TRPCError` from procedures. Its message and validation messages in
   Zod schemas are shown to users, so write them as sentences. Any other
-  error is logged, and in production reaches the client as a generic
-  message.
+  error, and a `TRPCError` with code `INTERNAL_SERVER_ERROR`, is logged and
+  in production reaches the client as a generic message: pick a more
+  specific code for a message users must see.
+- Tooltips: wrap the part of the page that has them in `<TooltipProvider>`.
+  It is not in the root layout, so pages without tooltips don't load them.
 
 ## Tooling notes
 
@@ -81,8 +89,9 @@ oxlint and oxfmt. Package manager: pnpm 12.
 - pnpm refuses releases younger than a day (`minimumReleaseAge`). If an
   install fails on a brand-new version, wait or pick the previous one; do not
   add exclusions.
-- `@types/node` tracks Node.js 24, the oldest version `engines` allows:
-  newer typings accept APIs that crash on Node.js 24. Raise both together.
+- `@types/node` and `.nvmrc` track Node.js 24, the oldest version `engines`
+  allows: newer typings accept APIs that crash on Node.js 24, and CI runs
+  the `.nvmrc` version. Raise all three together.
 - `prisma`, `@prisma/client` and `@prisma/adapter-pg` share one version.
   Check `@prisma/client`'s `latest` before bumping: `prisma`'s can point at a
   prerelease with no matching client.
