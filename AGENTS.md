@@ -27,9 +27,10 @@ checked by TypeScript 7, oxlint and oxfmt. Package manager: pnpm 12.
   or `pnpm db:plan --name <snake_case>` then `pnpm db:migrate` to record and
   apply a migration. Once `prisma/migrations` has one, always plan: a push
   leaves the database at a state no migration reaches, and the next plan
-  fails with `MIGRATION.HASH_NOT_IN_GRAPH`. To recover, plan from the newest
-  migration's folder, `pnpm db:plan --name <x> --from <folder>`, then
-  `pnpm db:migrate`. `db:push`, `db:plan`, `db:migrate` and `db:deploy` emit
+  fails with `MIGRATION.HASH_NOT_IN_GRAPH`. To recover, `pnpm db:push` (so
+  the database matches the contract; `db:migrate` refuses a database no
+  migration produced), then `pnpm db:plan --name <x> --from <folder>` with
+  the newest migration's folder, then `pnpm db:migrate`. `db:push`, `db:plan`, `db:migrate` and `db:deploy` emit
   the contract's types first (`pnpm db:generate` alone).
 - Every timestamp in the contract is `TimestamptzJsDate` (or
   `temporal.createdAtJsDate()` / `temporal.updatedAtJsDate()`): a `Date`, as
@@ -115,7 +116,8 @@ checked by TypeScript 7, oxlint and oxfmt. Package manager: pnpm 12.
 - `prisma` (the CLI) and `@prisma/orm-postgres` are release candidates,
   pinned exactly. Bump them together: the CLI's own `@prisma/orm-*`
   dependencies name the runtime version it was built with. Follow the
-  `prisma-8` skill's upgrade notes, then `pnpm check`.
+  `prisma-8` skill's upgrade notes, then `pnpm check`. Skip their
+  `prisma skills sync` steps: `pnpm install` relinks the skill.
 - `@prisma/prisma7` is Prisma 7's CLI, kept as `prisma7` for `pnpm db:dev`
   and `pnpm db:studio` (`prisma7.config.ts`): Prisma 8's `prisma dev` runs
   Prisma Composer instead, and it has no Studio yet.

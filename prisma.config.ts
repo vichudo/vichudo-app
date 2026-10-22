@@ -18,7 +18,8 @@ export default definePrismaConfig({
       connection: process.env.DATABASE_URL,
     },
   }),
-  // pnpm links the Prisma agent skills into `.claude/skills` (see
-  // pnpm-workspace.yaml); Prisma's own `skills sync` is not used.
-  skills: { check: false },
+  // pnpm links the Prisma agent skills into `.claude/skills` and keeps them at
+  // the installed version (see pnpm-workspace.yaml), so Prisma's own skills
+  // check is off and `prisma skills sync` copies them nowhere.
+  skills: { check: false, agents: [] },
 });
