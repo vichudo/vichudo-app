@@ -25,3 +25,16 @@ new RuleTester().run('no-else', noElse, {
     { code: 'if (a) return; else g();', errors: [{ messageId: 'noElse' }] },
   ],
 });
+
+const elseIfOnly = [{ elseIfOnly: true }];
+
+new RuleTester().run('no-else (elseIfOnly)', noElse, {
+  valid: [{ code: 'if (a) { g(); } else { h(); }', options: elseIfOnly }],
+  invalid: [
+    {
+      code: 'let x; if (a) { x = 1; } else if (b) { x = 2; } else { x = 3; }',
+      options: elseIfOnly,
+      errors: [{ messageId: 'noElse' }],
+    },
+  ],
+});

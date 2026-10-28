@@ -176,7 +176,8 @@
       "warn",
       { "terms": ["todo", "fixme", "hack", "xxx"] }
     ],
-    // `if` / `else` is the last resort: prefer early returns.
+    // `if` / `else` is the last resort: prefer early returns. Flags every
+    // `else`; `["warn", { "elseIfOnly": true }]` flags only `else if`.
     "local/no-else": "warn",
 
     // ── Unicorn: modern, unsurprising built-ins ─────────────────────────────
