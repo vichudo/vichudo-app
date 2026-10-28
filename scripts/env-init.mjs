@@ -8,9 +8,11 @@ const example = new URL('../.env.example', import.meta.url);
 // Whatever the example holds for it (normally `""`).
 const secretLine = /^BETTER_AUTH_SECRET=.*$/m;
 
-if (existsSync(target)) {
-  console.info('.env already exists; left as it is.');
-} else {
+function init() {
+  if (existsSync(target)) {
+    console.info('.env already exists; left as it is.');
+    return;
+  }
   const source = readFileSync(example, 'utf8');
   if (!secretLine.test(source)) {
     throw new Error('.env.example has no BETTER_AUTH_SECRET line to fill.');
@@ -24,3 +26,5 @@ if (existsSync(target)) {
   );
   console.info('Created .env with a fresh BETTER_AUTH_SECRET.');
 }
+
+init();
