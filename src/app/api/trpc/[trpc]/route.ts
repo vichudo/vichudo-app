@@ -20,7 +20,9 @@ const handler = (req: Request) =>
       const where = `tRPC failed on ${path ?? '<no-path>'}`;
       if (error.code === 'INTERNAL_SERVER_ERROR') {
         console.error(`${where}:`, error);
-      } else if (env.NODE_ENV === 'development') {
+        return;
+      }
+      if (env.NODE_ENV === 'development') {
         console.error(`${where}: ${error.message}`);
       }
     },
