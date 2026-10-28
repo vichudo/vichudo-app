@@ -16,7 +16,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.{ts,tsx}'],
+    include: ['src/**/*.test.{ts,tsx}', 'lint/**/*.test.ts'],
     // Unit tests never reach a real database or OAuth provider: skip the
     // schema check rather than seeding fake secrets. The app still validates.
     env: { SKIP_ENV_VALIDATION: '1' },
