@@ -73,6 +73,11 @@ oxlint and oxfmt. Package manager: pnpm 12.
   (`queryClient.clear()`) and reset the form; signing out reloads the page
   (`window.location`), since Next keeps visited pages mounted in the
   background and only a reload drops them.
+- `if` / `else` is the last resort. Prefer early returns, a helper or
+  component that returns each case, a lookup or exhaustive `switch`, then a
+  ternary / `??` for one value. `local/no-else` (`lint/plugin.ts`) flags every
+  `else`; keep a genuinely needed one with
+  `// oxlint-disable-next-line local/no-else -- <reason>`.
 - Throw `TRPCError` from procedures. Its message and validation messages in
   Zod schemas are shown to users, so write them as sentences. Any other
   error, and a `TRPCError` with code `INTERNAL_SERVER_ERROR`, is logged and
