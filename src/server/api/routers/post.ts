@@ -24,19 +24,16 @@ export const postRouter = createTRPCRouter({
       }),
     )
     .mutation(({ ctx, input }) =>
-      ctx.db.post.create({
-        data: {
-          name: input.name,
-          createdBy: { connect: { id: ctx.session.user.id } },
-        },
+      ctx.db.orm.public.Post.create({
+        name: input.name,
+        createdById: ctx.session.user.id,
       }),
     ),
 
   getLatest: protectedProcedure.query(({ ctx }) =>
-    ctx.db.post.findFirst({
-      orderBy: { createdAt: 'desc' },
-      where: { createdBy: { id: ctx.session.user.id } },
-    }),
+    ctx.db.orm.public.Post.where({ createdById: ctx.session.user.id })
+      .orderBy((post) => post.createdAt.desc())
+      .first(),
   ),
 
   getSecretMessage: protectedProcedure.query(

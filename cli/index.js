@@ -29,7 +29,8 @@ const TEMPLATE_ONLY = [
   '.github/workflows/create-app.yml',
 ];
 const UI_DIR = 'src/components/ui';
-const MIN_NODE_MAJOR = 24;
+// The template's oldest Node.js (its `engines`): Prisma's CLI needs 24.11.
+const MIN_NODE = { major: 24, minor: 11 };
 // The template's `pnpm db:dev` ports (server, database, shadow database).
 const TEMPLATE_DB_PORTS = [51213, 51214, 51215];
 // Commands installed as `.cmd` shims on Windows.
@@ -200,6 +201,15 @@ async function pickDatabasePorts() {
 }
 
 /**
+ * A port number as a whole word, e.g. in a script's arguments.
+ *
+ * @param {number} port
+ */
+function portPattern(port) {
+  return new RegExp(`\\b${port}\\b`, 'g');
+}
+
+/**
  * Points the template at this project: package name and its own local
  * database (`pnpm db:dev` server name and ports, mirrored in `.env.example`).
  *
@@ -208,22 +218,47 @@ async function pickDatabasePorts() {
  * @param {number[]} ports server, database and shadow database ports
  */
 function personalise(root, name, ports) {
+  /**
+   * Template port → this app's port, for each port `db:dev` uses.
+   *
+   * @type {Map<number, number>}
+   */
+  const moved = new Map();
   editFile(path.join(root, 'package.json'), (source) => {
     const pkg = /** @type {{ scripts: Record<string, string> }} */ (
       JSON.parse(source)
     );
-    const [server, database, shadow] = ports;
-    const scripts = {
-      ...pkg.scripts,
-      'db:dev': `prisma dev --name ${name} --port ${server} --db-port ${database} --shadow-db-port ${shadow}`,
-    };
+    const scripts = { ...pkg.scripts };
+    // Renames the template's own command and moves it to the free ports,
+    // rather than writing one: this CLI then fits any template version,
+    // whichever Prisma CLI it runs.
+    const template = scripts['db:dev'] ?? '';
+    let dbDev = template;
+    const named = /--name \S+/.test(dbDev);
+    dbDev = dbDev.replace(/--name \S+/, `--name ${name}`);
+    for (const [index, port] of TEMPLATE_DB_PORTS.entries()) {
+      const to = ports[index];
+      if (to === undefined || !portPattern(port).test(dbDev)) continue;
+      dbDev = dbDev.replace(portPattern(port), String(to));
+      moved.set(port, to);
+    }
+    if (!named || moved.size < TEMPLATE_DB_PORTS.length) {
+      console.warn(
+        styleText(
+          'yellow',
+          "The template's `db:dev` script has an unexpected shape: check its database name and ports.",
+        ),
+      );
+    }
+    if (template) scripts['db:dev'] = dbDev;
     return `${JSON.stringify({ ...pkg, name, scripts }, null, 2)}\n`;
   });
 
+  // `.env.example` follows the ports `db:dev` actually moved.
   editFile(path.join(root, '.env.example'), (source) =>
-    TEMPLATE_DB_PORTS.reduce(
-      (text, port, index) =>
-        text.replaceAll(`localhost:${port}/`, `localhost:${ports[index]}/`),
+    [...moved].reduce(
+      (text, [from, to]) =>
+        text.replaceAll(`localhost:${from}/`, `localhost:${to}/`),
       source,
     ),
   );
@@ -422,14 +457,22 @@ function parseOptions() {
   }
 }
 
-async function main() {
-  // First: older Node.js versions fail on the option parser below.
-  const nodeMajor = Number(process.versions.node.split('.')[0]);
-  if (nodeMajor < MIN_NODE_MAJOR) {
+/** Stops on a Node.js older than the template supports. */
+function assertNodeVersion() {
+  const [major = 0, minor = 0] = process.versions.node.split('.').map(Number);
+  if (
+    major < MIN_NODE.major ||
+    (major === MIN_NODE.major && minor < MIN_NODE.minor)
+  ) {
     throw new CliError(
-      `Node.js ${MIN_NODE_MAJOR} or newer is required; this is ${process.versions.node}.`,
+      `Node.js ${MIN_NODE.major}.${MIN_NODE.minor} or newer is required; this is ${process.versions.node}.`,
     );
   }
+}
+
+async function main() {
+  // First: older Node.js versions fail on the option parser below.
+  assertNodeVersion();
 
   const { values, positionals } = parseOptions();
 

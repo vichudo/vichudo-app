@@ -7,11 +7,29 @@
 # Dependencies allowed to run install scripts. Anything not listed fails the
 # install (`strictDepBuilds`), so a new native dependency is a deliberate choice.
 allowBuilds:
+  # Prisma 7's CLI (`@prisma/prisma7` wraps `prisma@7`), kept only for
+  # `prisma7 dev` (local Postgres) and Studio.
   '@prisma/engines': true
   prisma: true
+  # Prisma 8's CLI ships its deploy tooling (Composer) along with the ORM
+  # commands. These scripts only check platform binaries; the ORM commands
+  # do not need them.
+  esbuild: false
+  workerd: false
 
-# What else dependencies may do. tRPC ships agent skills that document the
-# installed version; pnpm links them into `.claude/skills` (gitignored).
+# One `pg` for the app: Prisma pins its own, but runs on the app's pool
+# (`src/server/db.ts`), so a second copy only brings a clashing `Pool` type.
+# The versions live in the catalog, which `package.json` refers to too.
+catalog:
+  pg: ^8.23.1
+  '@types/pg': ^8.23.1
+overrides:
+  pg: 'catalog:'
+  '@types/pg': 'catalog:'
+
+# What else dependencies may do. tRPC and Prisma ship agent skills that
+# document the installed version; pnpm links them into `.claude/skills`
+# (gitignored).
 # Named explicitly: pnpm otherwise detects agents on the machine, and fails the
 # install where it finds none (CI, editors other than Claude Code).
 skills:
@@ -19,6 +37,8 @@ skills:
     - .claude/skills
 
 permissions:
+  '@prisma/orm-postgres':
+    skills: true
   '@trpc/client':
     skills: true
   '@trpc/server':

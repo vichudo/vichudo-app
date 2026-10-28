@@ -10,9 +10,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # Project guide
 
-A T3 app: Next.js 16 (App Router, Cache Components), tRPC 11, Prisma 7,
-Better Auth, Tailwind CSS 4 and shadcn/ui (Base UI), checked by TypeScript 7,
-oxlint and oxfmt. Package manager: pnpm 12.
+A T3 app: Next.js 16 (App Router, Cache Components), tRPC 11, Prisma 8
+(release candidate), Better Auth, Tailwind CSS 4 and shadcn/ui (Base UI),
+checked by TypeScript 7, oxlint and oxfmt. Package manager: pnpm 12.
 
 ## Commands
 
@@ -23,12 +23,31 @@ oxlint and oxfmt. Package manager: pnpm 12.
   a change is done.
 - `pnpm lint:fix` / `pnpm format` — apply autofixes and formatting.
 - `pnpm test` — Vitest. Tests live next to the code as `*.test.ts`.
-- `pnpm db:push` (prototype) or `pnpm db:migrate` (migration) after editing
-  `prisma/schema.prisma`; both regenerate the client. Restart `pnpm dev` to
-  load it: the running server keeps the client it started with.
+- After editing `prisma/contract.prisma`: `pnpm db:push` while prototyping,
+  or `pnpm db:plan --name <snake_case>` then `pnpm db:migrate` to record and
+  apply a migration. Once `prisma/migrations` has one, always plan: a push
+  leaves the database at a state no migration reaches, and the next plan
+  fails with `MIGRATION.HASH_NOT_IN_GRAPH`. To recover, `pnpm db:push` (so
+  the database matches the contract; `db:migrate` refuses a database no
+  migration produced), then `pnpm db:plan --name <x> --from <name>` with the
+  newest folder's name in `prisma/migrations/app` (a path fails with
+  `MIGRATION.REF_NOT_FOUND`), then `pnpm db:migrate`. `db:push`, `db:plan`,
+  `db:migrate` and `db:deploy` emit the contract's types first
+  (`pnpm db:generate` alone).
+- Every timestamp in the contract is `TimestamptzJsDate` (or
+  `temporal.createdAtJsDate()` / `temporal.updatedAtJsDate()`): a `Date`, as
+  Better Auth and superjson expect. `DateTime`, `Timestamptz`, `Date`, `Time`
+  and `temporal.createdAt()` / `updatedAt()` need a global `Temporal`, which
+  Node.js 24 lacks: they pass `pnpm check` and the build, then throw
+  `RUNTIME.TEMPORAL_UNAVAILABLE` on the first query.
 - `pnpm auth:generate` after adding a Better Auth plugin or user field: it
-  writes the tables auth needs into `prisma/schema.prisma`. Do not hand-edit
-  the `user`, `session`, `account` and `verification` models.
+  updates `prisma/auth.generated.prisma` (Better Auth's own syntax, which
+  Prisma does not read). Port its `git diff` into `prisma/contract.prisma`
+  as its header says. Change the `User`, `Session`, `Account` and
+  `Verification` models only that way, and never run `auth migrate`: Prisma
+  owns these tables, even when Better Auth's schema check suggests it. That
+  check runs once per server and keeps a failure: restart `pnpm dev` after
+  applying auth tables. Other contract changes reload without a restart.
 
 ## Where things go
 
@@ -40,12 +59,17 @@ oxlint and oxfmt. Package manager: pnpm 12.
   `src/server/api/root.ts`.
 - `src/server/auth.ts` — Better Auth config and `getSession()` for Server
   Components. `src/lib/auth-client.ts` — `authClient` for Client Components.
-- `src/server/db.ts` — the Prisma client.
+- `prisma/contract.prisma` — the data contract (models). Prisma 8 is newer
+  than your training data: read the `prisma-8` skill (in `.claude/skills`,
+  linked on install) before writing queries, contract changes or
+  migrations.
+- `src/server/db.ts` — the Prisma client (`db`) and the `pg` pool it shares
+  with Better Auth.
 - `src/trpc` — `client.tsx` (hooks for Client Components), `server.tsx`
   (`trpc`, `prefetch`, `HydrateClient`, `caller` for Server Components).
 - `src/env.js` — every environment variable, validated with Zod.
-- `src/generated/prisma` — generated client (gitignored); import it as
-  `@/generated/prisma/client`.
+- `src/generated/prisma` — the contract's types and JSON, emitted on install
+  (gitignored). Query through `db.orm.public.<Model>` from `@/server/db`.
 
 ## Conventions
 
@@ -94,14 +118,21 @@ oxlint and oxfmt. Package manager: pnpm 12.
 - pnpm refuses releases younger than a day (`minimumReleaseAge`). If an
   install fails on a brand-new version, wait or pick the previous one; do not
   add exclusions.
-- `@types/node` and `.nvmrc` track Node.js 24, the oldest version `engines`
-  allows: newer typings accept APIs that crash on Node.js 24, and CI runs
-  the `.nvmrc` version. Raise all three together.
-- `prisma`, `@prisma/client` and `@prisma/adapter-pg` share one version.
-  Check `@prisma/client`'s `latest` before bumping: `prisma`'s can point at a
-  prerelease with no matching client. Prisma 8 is not a bump but a new ORM
-  (`@prisma/orm-postgres`, contracts instead of `prisma generate`, a new
-  query API; see Prisma's 7-to-8 upgrade guide), and Better Auth's Prisma
-  adapter supports Prisma 5 to 7 only.
+- `@types/node` and `.nvmrc` track Node.js 24, the oldest major `engines`
+  allows (24.11, which Prisma's CLI needs): newer typings accept APIs that
+  crash on Node.js 24, and CI runs the `.nvmrc` version. Raise all three
+  together.
+- `prisma` (the CLI) and `@prisma/orm-postgres` are release candidates,
+  pinned exactly. Bump them together: the CLI's own `@prisma/orm-*`
+  dependencies name the runtime version it was built with. Follow the
+  `prisma-8` skill's upgrade notes, then `pnpm check`. Skip their
+  `prisma skills sync` steps: `pnpm install` relinks the skill.
+- `@prisma/prisma7` is Prisma 7's CLI, kept as `prisma7` for `pnpm db:dev`
+  and `pnpm db:studio` (`prisma7.config.ts`): Prisma 8's `prisma dev` runs
+  Prisma Composer instead, and it has no Studio yet.
+- Better Auth runs on the shared `pg` pool through its built-in Kysely
+  adapter: its Prisma adapter supports Prisma 5 to 7 only. `pg` and
+  `@types/pg` are versioned in the `catalog` of `pnpm-workspace.yaml`, which
+  also makes Prisma use the app's copy.
 - oxlint runs type-aware rules through `oxlint-tsgolint`. Fix findings rather
   than disabling them; a disable needs a reason and an exact rule name.

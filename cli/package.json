@@ -1,6 +1,6 @@
 {
   "name": "create-vichudo-app",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Create a typesafe full-stack app: Next.js 16, tRPC, Prisma, Better Auth, Tailwind CSS and shadcn/ui.",
   "keywords": [
     "better-auth",
@@ -28,6 +28,6 @@
   ],
   "type": "module",
   "engines": {
-    "node": ">=24"
+    "node": ">=24.11"
   }
 }

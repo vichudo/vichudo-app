@@ -41,7 +41,7 @@ export default function Home() {
       <header className="flex items-start justify-between gap-6">
         <div className="flex flex-col gap-3">
           <Badge variant="secondary">
-            Next.js 16 · tRPC 11 · Prisma 7 · Tailwind 4
+            Next.js 16 · tRPC 11 · Prisma 8 · Tailwind 4
           </Badge>
           <h1 className="font-heading text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
             Create T3 App

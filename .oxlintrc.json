@@ -52,7 +52,9 @@
     "src/hooks/use-mobile.ts",
     "src/hooks/use-highlighted-code.ts",
     "src/lib/highlighter.tsx",
-    "src/generated/**"
+    "src/generated/**",
+    // Written by `prisma migration plan`, and hashed: edits break them.
+    "prisma/migrations/**"
   ],
   "rules": {
     // ── TypeScript: keep `any` and unchecked casts out ──────────────────────
@@ -322,7 +324,12 @@
     },
     {
       // The env schema and tool configs are where `process.env` is read.
-      "files": ["src/env.js", "prisma.config.ts", "vitest.config.ts"],
+      "files": [
+        "src/env.js",
+        "prisma.config.ts",
+        "prisma7.config.ts",
+        "vitest.config.ts"
+      ],
       "rules": { "node/no-process-env": "off" }
     },
     {
